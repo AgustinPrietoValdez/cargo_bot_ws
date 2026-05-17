@@ -15,8 +15,98 @@
 - [joshnewans/articubot_one](https://github.com/joshnewans/articubot_one) -- robot diferencial completo, multi-file xacro, ros2_control, lidar, camera
 - Video/blog del autor: [Articulated Robotics: URDF Design](https://articulatedrobotics.xyz/tutorials/mobile-robot/concept-design/concept-urdf/)
 
-### Paso 4: Antes de importar a Isaac Sim
+### Paso 4: Fusion 360 → meshes para URDF
+- [ACDC4Robot plugin](https://github.com/ACDC4Robot/Fusion360) -- exporta URDF directo desde Fusion 360 (recomendado)
+- [runtimerobotics/fusion360-urdf-ros2](https://github.com/runtimerobotics/fusion360-urdf-ros2) -- alternativa que genera un paquete ROS 2 completo
+- Video: [Articulated Robotics: Concept & URDF Design](https://articulatedrobotics.xyz/tutorials/mobile-robot/concept-design/concept-urdf/)
+
+### Paso 5: Antes de importar a Isaac Sim
 - [Isaac Sim 5.1: Import URDF Tutorial](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/importer_exporter/import_urdf.html)
+
+---
+
+## Flujo Fusion 360 → URDF → Isaac Sim
+
+### Opcion A: Plugin automatico (recomendado para empezar rapido)
+
+1. Instalar [ACDC4Robot](https://github.com/ACDC4Robot/Fusion360) en Fusion 360 (tambien en [Autodesk App Store](https://apps.autodesk.com/FUSION/en/Detail/Index?id=5028052292896011577))
+2. El plugin exporta URDF + meshes STL directamente
+3. Importar el URDF en Isaac Sim
+
+### Opcion B: Manual (mas control, mejor para aprender)
+
+#### Preparar el CAD en Fusion 360
+
+1. **Un componente por link URDF** -- cada pieza que se mueve independientemente (chasis, rueda izq, rueda der, caster, etc.) debe ser un Component separado en Fusion
+2. **NO usar componentes anidados** -- todos los link-components deben ser hijos directos del root assembly
+3. **Nombrar bien** -- `base_link`, `left_wheel`, `right_wheel`, `caster_wheel`, `lidar_mount`. Solo letras, numeros, underscore
+4. **Definir joints en Fusion** -- usar la herramienta Joint para definir Revolute (ruedas), Rigid (caster, lidar). Los ejes de rotacion deben coincidir con los ejes reales
+5. **Orientar el robot** -- ROS usa X-adelante, Y-izquierda, Z-arriba. Fusion usa Y-arriba por defecto. Reorientar antes de exportar
+6. **Origen en el centro entre ruedas** -- el origen del ensamble debe estar en el punto medio entre las dos ruedas motrices, a nivel del suelo
+
+#### Exportar meshes
+
+1. **Click derecho en cada componente > "Save as STL"** (NO usar File > Export, que siempre exporta en cm)
+2. **Refinamiento High** para meshes visuales, **Low** para colision
+3. Fusion trabaja en mm, URDF espera metros. Hay dos opciones:
+   - Poner document units en metros antes de exportar
+   - Dejar en mm y agregar `scale="0.001 0.001 0.001"` en cada tag `<mesh>` del URDF
+4. Guardar en:
+   ```
+   cargo_bot_description/meshes/
+   ├── visual/       # STL detallados (High refinement)
+   │   ├── base_link.stl
+   │   ├── left_wheel.stl
+   │   ├── right_wheel.stl
+   │   └── ...
+   └── collision/    # STL simplificados (Low refinement, o primitivas)
+       ├── base_link.stl
+       └── ...
+   ```
+
+#### Referenciar en Xacro
+
+```xml
+<link name="base_link">
+  <visual>
+    <geometry>
+      <mesh filename="package://cargo_bot_description/meshes/visual/base_link.stl"
+            scale="0.001 0.001 0.001"/>
+    </geometry>
+  </visual>
+  <collision>
+    <!-- Opcion 1: mesh simplificado -->
+    <geometry>
+      <mesh filename="package://cargo_bot_description/meshes/collision/base_link.stl"
+            scale="0.001 0.001 0.001"/>
+    </geometry>
+    <!-- Opcion 2 (recomendado para rendimiento): primitiva -->
+    <!--
+    <geometry>
+      <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+    </geometry>
+    -->
+  </collision>
+  <xacro:inertial_box mass="${chassis_mass}"
+                       x="${chassis_length}" y="${chassis_width}" z="${chassis_height}"/>
+</link>
+```
+
+#### Obtener masas e inercias de Fusion 360
+
+1. Seleccionar el componente
+2. Menu: Inspect > Physical Properties
+3. Anotar: Mass (convertir a kg), Center of Mass, Moments of Inertia (convertir a kg*m^2)
+4. Usar esos valores en los tags `<inertial>` del URDF, o usar las macros de abajo que los calculan de la geometria
+
+### Tip: colision visual vs colision fisica
+
+| Mesh | Uso | Formato | Detalle |
+|------|-----|---------|---------|
+| Visual | Lo que se ve en RViz/Isaac | STL High | Detallado, el peso no importa |
+| Colision | Lo que la fisica usa para chocar | Primitiva o STL Low | Lo mas simple posible, afecta performance |
+
+Para el cargo_bot, recomiendo **primitivas para colision** (cajas y cilindros) y **STL de Fusion para visual**. Asi se ve tu robot real pero la fisica corre rapido.
 
 ---
 
@@ -111,6 +201,14 @@ ixx = iyy = izz = 2 * m * r^2 / 5
 
 ---
 
+## Gotchas de Fusion 360
+
+1. **File > Export da centimetros** -- siempre usar "Save as STL" (click derecho en component), no File > Export
+2. **Componentes, no Bodies** -- cada link URDF debe ser un Component de Fusion, no solo un Body
+3. **Sin anidamiento** -- los plugins no soportan componentes anidados. Aplanar la jerarquia
+4. **Y-up vs Z-up** -- Fusion usa Y-arriba, ROS usa Z-arriba. Reorientar antes de exportar o rotar en el URDF
+5. **Fusion calcula inercias** -- Inspect > Physical Properties te da masa, centro de masa e inercias. Usalas
+
 ## Gotchas importantes para Isaac Sim
 
 1. **Xacro no se importa directo** -- Primero convertir: `ros2 run xacro xacro cargo_bot.urdf.xacro > cargo_bot.urdf`
@@ -156,11 +254,16 @@ ixx = iyy = izz = 2 * m * r^2 / 5
 
 ## Checklist antes de pasar a Fase 2
 
+- [ ] CAD completo en Fusion 360 con un Component por link URDF
+- [ ] Meshes STL exportados (visual/ y collision/ o usar primitivas para colision)
+- [ ] Si exportaste en mm: `scale="0.001 0.001 0.001"` en cada `<mesh>` del URDF
 - [ ] URDF compila sin errores: `ros2 run xacro xacro cargo_bot.urdf.xacro`
 - [ ] Se visualiza en RViz2: `ros2 launch cargo_bot_description display.launch.py`
+- [ ] El robot se ve igual a tu CAD (meshes cargados correctamente)
 - [ ] Ruedas giran con joint_state_publisher_gui
 - [ ] TF tree es correcto (verificar con `ros2 run tf2_tools view_frames`)
-- [ ] Todas las colisiones son geometrias simples (cajas, cilindros, esferas)
-- [ ] Todas los links tienen masa + inercia
-- [ ] Nombres de joints/links sin caracteres raros
-- [ ] Exportado a .urdf puro (sin xacro) listo para importar en Isaac Sim
+- [ ] Todas las colisiones son geometrias simples (cajas, cilindros, esferas) o STL Low
+- [ ] Todos los links tienen masa + inercia (de Fusion Physical Properties o calculada)
+- [ ] Nombres de joints/links sin caracteres raros (solo letras, numeros, _)
+- [ ] Exportado a .urdf puro (sin xacro) listo para importar en Isaac Sim:
+      `ros2 run xacro xacro cargo_bot.urdf.xacro > cargo_bot.urdf`
