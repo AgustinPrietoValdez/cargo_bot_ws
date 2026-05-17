@@ -1,43 +1,66 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-    <profiles>
-        <transport_descriptors>
-            <transport_descriptor>
-                <transport_id>udp_transport</transport_id>
-                <type>UDPv4</type>
-            </transport_descriptor>
-            <transport_descriptor>
-                <transport_id>shm_transport</transport_id>
-                <type>SHM</type>
-            </transport_descriptor>
-        </transport_descriptors>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FastDDS profile for ROS 2 nodes in WSL2 — cargo_bot project.
+     Hybrid SHM + UDPv4. SHM handles intra-WSL node communication,
+     UDPv4 handles cross-OS traffic to/from Isaac Sim on Windows.
+     SUPER_CLIENT so ros2 CLI tools can introspect all topics. -->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
 
-        <participant profile_name="wsl_super_client" is_default_profile="true">
-            <rtps>
-                <useBuiltinTransports>false</useBuiltinTransports>
-                <userTransports>
-                    <transport_id>shm_transport</transport_id>
-                    <transport_id>udp_transport</transport_id>
-                </userTransports>
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>UdpTransport</transport_id>
+      <type>UDPv4</type>
+      <sendBufferSize>1048576</sendBufferSize>
+      <receiveBufferSize>4194304</receiveBufferSize>
+      <non_blocking_send>true</non_blocking_send>
+    </transport_descriptor>
 
-                <builtin>
-                    <discovery_config>
-                        <discoveryProtocol>SUPER_CLIENT</discoveryProtocol>
-                        <discoveryServersList>
-                            <RemoteServer prefix="44.49.53.43.53.45.52.56.45.52.00.00">
-                                <metatrafficUnicastLocatorList>
-                                    <locator>
-                                        <udpv4>
-                                            <address>127.0.0.1</address>
-                                            <port>11811</port>
-                                        </udpv4>
-                                    </locator>
-                                </metatrafficUnicastLocatorList>
-                            </RemoteServer>
-                        </discoveryServersList>
-                    </discovery_config>
-                </builtin>
-            </rtps>
-        </participant>
-    </profiles>
-</dds>
+    <transport_descriptor>
+      <transport_id>ShmTransport</transport_id>
+      <type>SHM</type>
+      <segment_size>4194304</segment_size>
+      <port_queue_capacity>1024</port_queue_capacity>
+      <healthy_check_timeout_ms>1000</healthy_check_timeout_ms>
+    </transport_descriptor>
+  </transport_descriptors>
+
+  <participant profile_name="cargo_bot_wsl" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>ShmTransport</transport_id>
+        <transport_id>UdpTransport</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+
+      <builtin>
+        <discovery_config>
+          <discoveryProtocol>SUPER_CLIENT</discoveryProtocol>
+          <discoveryServersList>
+            <RemoteServer prefix="44.53.00.5f.45.50.52.4f.53.49.4d.41">
+              <metatrafficUnicastLocatorList>
+                <locator>
+                  <udpv4>
+                    <address>127.0.0.1</address>
+                    <port>11811</port>
+                  </udpv4>
+                </locator>
+              </metatrafficUnicastLocatorList>
+            </RemoteServer>
+          </discoveryServersList>
+          <leaseDuration>
+            <sec>30</sec>
+          </leaseDuration>
+          <leaseAnnouncement>
+            <sec>10</sec>
+          </leaseAnnouncement>
+          <initialAnnouncements>
+            <count>10</count>
+            <period>
+              <nanosec>100000000</nanosec>
+            </period>
+          </initialAnnouncements>
+        </discovery_config>
+      </builtin>
+    </rtps>
+  </participant>
+
+</profiles>

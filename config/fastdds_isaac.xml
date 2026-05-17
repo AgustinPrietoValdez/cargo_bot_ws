@@ -1,38 +1,61 @@
-<?xml version="1.0" encoding="UTF-8" ?>
-<dds xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
-    <profiles>
-        <transport_descriptors>
-            <transport_descriptor>
-                <transport_id>udp_transport</transport_id>
-                <type>UDPv4</type>
-            </transport_descriptor>
-        </transport_descriptors>
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- FastDDS profile for Isaac Sim (Windows) — cargo_bot project.
+     Based on working swarm project config (v3).
+     CLIENT mode pointing to Discovery Server on WSL2:11811.
+     The <address> inside <RemoteServer> is rewritten by launch_isaac_ros.cmd
+     on each launch to match the current WSL IP (NAT mode). -->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
 
-        <participant profile_name="isaac_client" is_default_profile="true">
-            <rtps>
-                <useBuiltinTransports>false</useBuiltinTransports>
-                <userTransports>
-                    <transport_id>udp_transport</transport_id>
-                </userTransports>
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>UdpTransport</transport_id>
+      <type>UDPv4</type>
+      <sendBufferSize>1048576</sendBufferSize>
+      <receiveBufferSize>4194304</receiveBufferSize>
+      <non_blocking_send>true</non_blocking_send>
+      <interfaceWhiteList>
+        <address>172.25.160.1</address>
+      </interfaceWhiteList>
+    </transport_descriptor>
+  </transport_descriptors>
 
-                <builtin>
-                    <discovery_config>
-                        <discoveryProtocol>CLIENT</discoveryProtocol>
-                        <discoveryServersList>
-                            <RemoteServer prefix="44.49.53.43.53.45.52.56.45.52.00.00">
-                                <metatrafficUnicastLocatorList>
-                                    <locator>
-                                        <udpv4>
-                                            <address>WSL_IP_PLACEHOLDER</address>
-                                            <port>11811</port>
-                                        </udpv4>
-                                    </locator>
-                                </metatrafficUnicastLocatorList>
-                            </RemoteServer>
-                        </discoveryServersList>
-                    </discovery_config>
-                </builtin>
-            </rtps>
-        </participant>
-    </profiles>
-</dds>
+  <participant profile_name="cargo_bot_isaac" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>UdpTransport</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+
+      <builtin>
+        <discovery_config>
+          <discoveryProtocol>CLIENT</discoveryProtocol>
+          <discoveryServersList>
+            <RemoteServer prefix="44.53.00.5f.45.50.52.4f.53.49.4d.41">
+              <metatrafficUnicastLocatorList>
+                <locator>
+                  <udpv4>
+                    <address>172.25.175.230</address>
+                    <port>11811</port>
+                  </udpv4>
+                </locator>
+              </metatrafficUnicastLocatorList>
+            </RemoteServer>
+          </discoveryServersList>
+          <leaseDuration>
+            <sec>30</sec>
+          </leaseDuration>
+          <leaseAnnouncement>
+            <sec>10</sec>
+          </leaseAnnouncement>
+          <initialAnnouncements>
+            <count>10</count>
+            <period>
+              <nanosec>100000000</nanosec>
+            </period>
+          </initialAnnouncements>
+        </discovery_config>
+      </builtin>
+    </rtps>
+  </participant>
+
+</profiles>

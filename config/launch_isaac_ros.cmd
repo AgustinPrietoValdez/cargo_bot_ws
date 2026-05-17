@@ -1,30 +1,31 @@
 @echo off
 REM Launch script for Isaac Sim with ROS 2 Discovery Server (cargo_bot)
-REM Detects WSL2 IP, patches fastdds_isaac.xml, sets env vars, launches Isaac Sim
+REM Detects WSL2 IP, patches fastdds_isaac.xml RemoteServer address, launches Isaac Sim
 
-setlocal enabledelayedexpansion
+setlocal EnableDelayedExpansion
 
 echo === Cargo Bot: Isaac Sim ROS 2 Launcher ===
 
 REM Detect WSL2 IP address
-for /f "tokens=*" %%i in ('wsl -d Ubuntu-22.04 -- hostname -I') do set WSL_RAW=%%i
-for /f "tokens=1" %%a in ("%WSL_RAW%") do set WSL_IP=%%a
-
-if "%WSL_IP%"=="" (
-    echo ERROR: Could not detect WSL2 IP address. Is WSL running?
-    exit /b 1
+for /f "usebackq tokens=*" %%i in (`powershell -NoProfile -Command "(wsl.exe -d Ubuntu-22.04 -- hostname -I).Trim().Split(' ')[0]"`) do (
+  set "WSL_IP=%%i"
 )
-echo WSL2 IP detected: %WSL_IP%
+if "!WSL_IP!"=="" (
+    echo ERROR: Could not detect WSL2 IP address. Is WSL running?
+    endlocal & exit /b 1
+)
+echo WSL2 IP detected: !WSL_IP!
 
-REM Patch the FastDDS XML with current WSL IP
-set CONFIG_DIR=%~dp0
-set XML_FILE=%CONFIG_DIR%fastdds_isaac.xml
-set XML_TEMPLATE=%CONFIG_DIR%fastdds_isaac.xml
+REM Patch ONLY the RemoteServer <address> in fastdds_isaac.xml (not interfaceWhiteList)
+set "CONFIG_DIR=%~dp0"
+set "XML_FILE=%CONFIG_DIR%fastdds_isaac.xml"
 
-REM Use PowerShell to replace the IP placeholder or previous IP
-powershell -Command "(Get-Content '%XML_FILE%') -replace '<address>[^<]+</address>', '<address>%WSL_IP%</address>' | Set-Content '%XML_FILE%' -Encoding UTF8"
-
-echo FastDDS XML updated with WSL IP: %WSL_IP%
+powershell -NoProfile -Command "$p='%XML_FILE%'; $c=[IO.File]::ReadAllText($p); $new=[regex]::Replace($c, '(<RemoteServer[^>]*?>\s*<metatrafficUnicastLocatorList>\s*<locator>\s*<udpv4>\s*<address>)[^<]+', '${1}!WSL_IP!'); [IO.File]::WriteAllText($p, $new, (New-Object System.Text.UTF8Encoding $false))"
+if errorlevel 1 (
+    echo ERROR: failed to rewrite %XML_FILE%
+    endlocal & exit /b 1
+)
+echo FastDDS XML RemoteServer.address = !WSL_IP!
 
 REM Set environment variables
 set ROS_DOMAIN_ID=1
@@ -35,7 +36,7 @@ echo ROS_DOMAIN_ID=%ROS_DOMAIN_ID%
 echo RMW_IMPLEMENTATION=%RMW_IMPLEMENTATION%
 echo FASTRTPS_DEFAULT_PROFILES_FILE=%FASTRTPS_DEFAULT_PROFILES_FILE%
 
-REM Source Isaac Sim ROS env
+REM Source Isaac Sim ROS env (adds bridge DLLs to PATH)
 call "C:\isaac-sim\setup_ros_env.bat"
 
 echo.
