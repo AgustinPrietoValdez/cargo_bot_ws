@@ -110,6 +110,298 @@ Para el cargo_bot, recomiendo **primitivas para colision** (cajas y cilindros) y
 
 ---
 
+## Referencia URDF/Xacro: cada elemento explicado
+
+### Estructura basica de un archivo Xacro
+
+```xml
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="mi_robot">
+  <!-- Todo el contenido va aca adentro -->
+</robot>
+```
+- `xmlns:xacro` habilita las funciones de Xacro (variables, macros, math, includes)
+- `name` es el nombre del robot (aparece en RViz, logs, etc.)
+
+---
+
+### `<xacro:property>` -- Variables
+
+Definen constantes reutilizables. Cambias el valor en un solo lugar y se propaga a todo el archivo.
+
+```xml
+<xacro:property name="wheel_radius" value="0.04"/>
+<xacro:property name="wheel_mass"   value="0.2"/>
+```
+
+Se usan con `${}`:
+```xml
+<cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+```
+
+Soportan matematica:
+```xml
+<origin xyz="${chassis_length/2} 0 0"/>
+<origin xyz="0 ${wheel_separation/2} 0"/>
+```
+
+---
+
+### `<xacro:include>` -- Incluir otros archivos
+
+Divide el URDF en archivos mas chicos y manejables:
+
+```xml
+<xacro:include filename="inertial_macros.xacro"/>
+<xacro:include filename="chassis.xacro"/>
+<xacro:include filename="wheels.xacro"/>
+<xacro:include filename="sensors.xacro"/>
+```
+
+Cada archivo incluido tiene su propio `<robot xmlns:xacro=...>` wrapper pero se fusionan en uno solo al compilar.
+
+---
+
+### `<xacro:macro>` -- Macros (funciones reutilizables)
+
+Definen bloques de URDF que se pueden reusar con parametros distintos. Ideal para las dos ruedas (mismo diseno, distinta posicion):
+
+```xml
+<!-- Definicion de la macro -->
+<xacro:macro name="wheel" params="prefix y_offset">
+  <link name="${prefix}_wheel_link">
+    <visual>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+      </geometry>
+    </collision>
+    <xacro:inertial_cylinder mass="${wheel_mass}"
+                              length="${wheel_width}" radius="${wheel_radius}"/>
+  </link>
+
+  <joint name="${prefix}_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="${prefix}_wheel_link"/>
+    <origin xyz="0 ${y_offset} 0" rpy="${-pi/2} 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+</xacro:macro>
+
+<!-- Uso: una llamada por rueda -->
+<xacro:wheel prefix="left"  y_offset="${wheel_separation/2}"/>
+<xacro:wheel prefix="right" y_offset="${-wheel_separation/2}"/>
+```
+
+---
+
+### `<link>` -- Cuerpo rigido
+
+Cada pieza fisica del robot. Tiene 3 secciones:
+
+```xml
+<link name="base_link">
+
+  <!-- VISUAL: lo que se ve en RViz / Isaac Sim -->
+  <visual>
+    <origin xyz="0 0 0" rpy="0 0 0"/>          <!-- offset respecto al origen del link -->
+    <geometry>
+      <box size="0.30 0.25 0.10"/>              <!-- primitiva: box, cylinder, sphere -->
+      <!-- o mesh de Fusion: -->
+      <!-- <mesh filename="package://cargo_bot_description/meshes/visual/base_link.stl"
+                  scale="0.001 0.001 0.001"/> -->
+    </geometry>
+    <material name="blue">                       <!-- color (solo RViz, Isaac usa sus propios) -->
+      <color rgba="0.2 0.2 0.8 1.0"/>
+    </material>
+  </visual>
+
+  <!-- COLLISION: lo que la fisica usa para detectar choques -->
+  <collision>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+    <geometry>
+      <box size="0.30 0.25 0.10"/>              <!-- primitivas son mas rapidas que meshes -->
+    </geometry>
+  </collision>
+
+  <!-- INERTIAL: masa + inercia (OBLIGATORIO para simulacion) -->
+  <inertial>
+    <origin xyz="0 0 0" rpy="0 0 0"/>          <!-- centro de masa respecto al origen del link -->
+    <mass value="2.5"/>
+    <inertia ixx="0.005" ixy="0.0" ixz="0.0"
+             iyy="0.007" iyz="0.0"
+             izz="0.009"/>
+  </inertial>
+  <!-- o usar una macro: <xacro:inertial_box mass="2.5" x="0.30" y="0.25" z="0.10"/> -->
+
+</link>
+```
+
+**Reglas:**
+- Cada link DEBE tener las 3 secciones (visual, collision, inertial) para que funcione en simulacion
+- Excepcion: links "dummy" como `base_footprint` pueden no tener visual/collision (solo sirven como frame de referencia)
+- `<origin>` es relativo al origen del link, NO al mundo
+
+---
+
+### `<joint>` -- Conexion entre links
+
+Define como se conectan dos links y como se mueven entre si:
+
+```xml
+<joint name="left_wheel_joint" type="continuous">
+  <parent link="base_link"/>                    <!-- link padre -->
+  <child link="left_wheel_link"/>               <!-- link hijo -->
+  <origin xyz="0 0.13 0" rpy="${-pi/2} 0 0"/>  <!-- posicion del hijo respecto al padre -->
+  <axis xyz="0 0 1"/>                           <!-- eje de rotacion (en frame del joint) -->
+</joint>
+```
+
+**Tipos de joint:**
+
+| Tipo | Movimiento | Uso en cargo_bot |
+|------|-----------|-----------------|
+| `fixed` | Ninguno, rigido | caster, lidar, imu, base_footprint→base_link |
+| `continuous` | Rotacion infinita | ruedas motrices |
+| `revolute` | Rotacion con limites | (no lo usamos) |
+| `prismatic` | Traslacion lineal | (no lo usamos) |
+
+**`<origin>`** -- la posicion y rotacion del frame del hijo respecto al padre:
+- `xyz` = traslacion en metros (x adelante, y izquierda, z arriba)
+- `rpy` = rotacion en radianes (roll, pitch, yaw)
+- Ejemplo: `rpy="${-pi/2} 0 0"` rota -90 grados en X (para poner un cilindro horizontal como rueda)
+
+**`<axis>`** -- el eje alrededor del cual gira el joint:
+- `xyz="0 0 1"` = gira alrededor de Z del frame del joint
+- Para ruedas: despues de rotar el frame con `rpy`, Z del joint queda apuntando al eje de la rueda
+
+---
+
+### `<material>` -- Colores (solo RViz)
+
+```xml
+<material name="blue">
+  <color rgba="0.2 0.2 0.8 1.0"/>    <!-- R G B Alpha, valores 0.0 a 1.0 -->
+</material>
+```
+
+Se pueden definir una vez y referenciar por nombre:
+```xml
+<!-- Definir arriba del todo -->
+<material name="white">
+  <color rgba="1.0 1.0 1.0 1.0"/>
+</material>
+
+<!-- Usar en cualquier link -->
+<visual>
+  <geometry>...</geometry>
+  <material name="white"/>            <!-- referencia por nombre -->
+</visual>
+```
+
+Isaac Sim ignora estos colores — usa sus propios materiales. Solo sirven para RViz.
+
+---
+
+### Constantes utiles de Xacro
+
+```xml
+<!-- pi ya viene definido en xacro, no hace falta declararlo -->
+<origin rpy="${pi/2} 0 0"/>     <!-- 90 grados -->
+<origin rpy="${-pi/2} 0 0"/>    <!-- -90 grados -->
+<origin rpy="0 0 ${pi}"/>      <!-- 180 grados -->
+```
+
+---
+
+### `<xacro:if>` y `<xacro:unless>` -- Condicionales
+
+Sirven para tener variantes (ej: con o sin lidar):
+
+```xml
+<xacro:property name="use_lidar" value="true"/>
+
+<xacro:if value="${use_lidar}">
+  <!-- solo se incluye si use_lidar es true -->
+  <xacro:include filename="sensors.xacro"/>
+</xacro:if>
+```
+
+---
+
+### Compilar Xacro a URDF
+
+Xacro es un preprocesador. El resultado final es URDF puro. Para verificar:
+
+```bash
+# Compilar y ver el URDF generado
+ros2 run xacro xacro cargo_bot.urdf.xacro
+
+# Guardar a archivo (necesario para importar en Isaac Sim)
+ros2 run xacro xacro cargo_bot.urdf.xacro > cargo_bot.urdf
+
+# Verificar que el URDF es valido
+check_urdf cargo_bot.urdf
+```
+
+---
+
+### Ejemplo minimo completo (un cubo con una rueda)
+
+```xml
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="ejemplo">
+
+  <xacro:property name="body_mass" value="1.0"/>
+  <xacro:property name="body_size" value="0.2"/>
+  <xacro:property name="wheel_r" value="0.04"/>
+  <xacro:property name="wheel_w" value="0.02"/>
+
+  <!-- Link 1: cuerpo -->
+  <link name="base_link">
+    <visual>
+      <geometry><box size="${body_size} ${body_size} ${body_size}"/></geometry>
+    </visual>
+    <collision>
+      <geometry><box size="${body_size} ${body_size} ${body_size}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="${body_mass}"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <!-- Link 2: rueda -->
+  <link name="wheel_link">
+    <visual>
+      <geometry><cylinder radius="${wheel_r}" length="${wheel_w}"/></geometry>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="${wheel_r}" length="${wheel_w}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.0001" ixy="0" ixz="0" iyy="0.0001" iyz="0" izz="0.0001"/>
+    </inertial>
+  </link>
+
+  <!-- Joint: conecta cuerpo con rueda -->
+  <joint name="wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="wheel_link"/>
+    <origin xyz="0 ${body_size/2 + wheel_w/2} 0" rpy="${-pi/2} 0 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+</robot>
+```
+
+---
+
 ## Estructura de archivos que vas a crear
 
 ```
