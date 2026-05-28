@@ -1,0 +1,53 @@
+============================================================
+DIAGNOSTIC: RTX Lidar pipeline state
+============================================================
+
+--- All RenderProduct prims (active in stage right now) ---
+  /Render/OmniverseKit/HydraTextures/omni_kit_widget_viewport_ViewportTexture_0
+    camera: ['/OmniverseKit_Persp']
+    orderedVars: ['/Render/Vars/LdrColor']
+    active: True
+  /Render/OmniverseKit/HydraTextures/Replicator_03
+    camera: ['/cargo_bot/lidar_link/RPLIDAR_S2E/RPLidar_S2E']
+    orderedVars: ['/Render/Vars/LdrColor']
+    active: True
+  /Render/OmniverseKit/HydraTextures/Replicator
+    camera: ['/cargo_bot/lidar_link/RPLIDAR_S2E/RPLidar_S2E']
+    orderedVars: ['/Render/Vars/GenericModelOutput', '/Render/Vars/RtxSensorMetadata']
+    active: True
+  /Render/OmniverseKit/HydraTextures/CargoBotLidarRP
+    camera: ['/cargo_bot/lidar_link/RPLIDAR_S2E/RPLidar_S2E']
+    orderedVars: ['/Render/Vars/LdrColor']
+    active: True
+  /Render/OmniverseKit/HydraTextures/CargoBotLidarRP_01
+    camera: ['/cargo_bot/lidar_link/cargo_bot/RPLIDAR_S2E/RPLidar_S2E']
+    orderedVars: ['/Render/Vars/GenericModelOutput', '/Render/Vars/RtxSensorMetadata', '/Render/Vars/LdrColor']
+    active: True
+  /Render/OmniverseKit/HydraTextures/CargoBotLidarRP_02
+    camera: ['/cargo_bot/lidar_link/cargo_bot/RPLIDAR_S2E/RPLidar_S2E']
+    orderedVars: ['/Render/Vars/GenericModelOutput', '/Render/Vars/RtxSensorMetadata', '/Render/Vars/LdrColor']
+    active: True
+
+--- OmniLidar prim APIs ---
+  NOT FOUND at /cargo_bot/lidar_link/RPLIDAR_S2E/RPLidar_S2E
+
+--- ActionGraph lidar chain nodes ---
+  /cargo_bot/ActionGraph/ros2_rtx_lidar_helper
+    inputs:enabled = False
+    inputs:frameId = 'lidar_link'
+    inputs:renderProductPath = '/Render/OmniverseKit/HydraTextures/Replicator'
+    inputs:showDebugView = True
+    inputs:topicName = '/laser_scan'
+  /cargo_bot/ActionGraph/isaac_create_render_product
+    inputs:enabled = False
+    [out] renderProductPath = None
+  /cargo_bot/ActionGraph/isaac_run_one_simulation_frame
+    inputs:enabled = False
+
+--- OG graph runtime state ---
+  node /cargo_bot/ActionGraph/ros2_rtx_lidar_helper
+  node /cargo_bot/ActionGraph/isaac_create_render_product
+
+============================================================
+END OF DIAGNOSTIC
+============================================================

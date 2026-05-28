@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+  <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="base_x" value="0.43"/>
+  <xacro:property name="base_y" value="0.29"/>
+  <xacro:property name="base_z" value="0.3"/>
+
+    <link name="base_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+        <mesh filename="package://cargo_bot_description/meshes/visual/base_link.stl"
+        scale="0.001 0.001 0.001"/>
+        </geometry>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <geometry>
+        <mesh filename="package://cargo_bot_description/meshes/collision/base_link.stl"
+        scale="0.001 0.001 0.001"/>
+        </geometry>
+      </collision>
+      <xacro:inertial_box mass="2.5" x="${base_x}" y="${base_y}" z="${base_z}"/>  <!--  cambiar valores -->
+    </link>
+    <link name="base_footprint"/>
+        <joint name="base_footprint_joint" type="fixed">
+        <parent link="base_footprint"/>
+        <child link="base_link"/>
+        <origin xyz="0 0 0.02" rpy="0 0 0"/>
+        </joint>
+  </robot>

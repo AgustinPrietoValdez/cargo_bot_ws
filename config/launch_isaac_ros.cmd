@@ -37,7 +37,7 @@ echo RMW_IMPLEMENTATION=%RMW_IMPLEMENTATION%
 echo FASTRTPS_DEFAULT_PROFILES_FILE=%FASTRTPS_DEFAULT_PROFILES_FILE%
 
 REM Source Isaac Sim ROS env (adds bridge DLLs to PATH)
-call "C:\isaac-sim\setup_ros_env.bat"
+call "C:\isaacsim_51_ga\setup_ros_env.bat"
 
 echo.
 echo Environment ready. Launching Isaac Sim...
@@ -45,6 +45,6 @@ echo (Make sure Discovery Server is running in WSL2 first!)
 echo.
 
 REM Launch Isaac Sim with ROS 2 bridge enabled
-"C:\isaac-sim\isaac-sim.bat" --/isaac/startup/ros_bridge_extension=isaacsim.ros2.bridge
+"C:\isaacsim_51_ga\isaac-sim.bat" --/isaac/startup/ros_bridge_extension=isaacsim.ros2.bridge
 
 endlocal

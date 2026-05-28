@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+<xacro:property name="wheel_radius" value="0.1"/>
+<xacro:property name="wheel_mass"   value="0.2"/>
+<xacro:property name="wheel_width"  value="0.02"/>
+<xacro:property name="wheel_separation" value="0.29"/>
+<xacro:macro name="wheel" params="prefix y_offset">
+  <link name="${prefix}_wheel_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://cargo_bot_description/meshes/visual/${prefix}_wheel.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://cargo_bot_description/meshes/collision/${prefix}_wheel.stl"
+              scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <xacro:inertial_cylinder mass="${wheel_mass}"
+                              length="${wheel_width}" radius="${wheel_radius}"/>
+  </link>
+
+  <joint name="${prefix}_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="${prefix}_wheel_link"/>
+    <origin xyz="-0.115 ${y_offset} 0.03" rpy="${pi/2} 0  0"/>
+    <!-- axis inverted (was 0 0 1) so positive cmd_vel.linear.x = forward.
+         Avoids needing a Negate node downstream of DifferentialController. -->
+    <axis xyz="0 0 -1"/>
+  </joint>
+  </xacro:macro>
+
+<xacro:wheel prefix="left"  y_offset="${wheel_separation/2 + wheel_width}"/>
+<xacro:wheel prefix="right" y_offset="${-wheel_separation/2}"/>
+    <link name="caster_wheel_link">
+    <visual>
+        <geometry>
+        <mesh filename="package://cargo_bot_description/meshes/visual/caster_wheel.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+    </visual>
+    <collision>
+        <geometry>
+        <mesh filename="package://cargo_bot_description/meshes/collision/caster_wheel.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+    </collision>
+    <xacro:inertial_sphere mass="0.1" radius="0.02"/>
+    </link>
+    <joint name="caster_wheel_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="caster_wheel_link"/>
+        <origin xyz="0.15 0 0" rpy="${-pi/2} 0 0"/>
+        </joint>
+</robot>

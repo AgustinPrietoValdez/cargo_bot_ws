@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <link name="lidar_link">
+        <visual>
+        <geometry>
+            <mesh filename="package://cargo_bot_description/meshes/visual/lidar.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        </visual>
+        <collision>
+        <geometry>
+            <mesh filename="package://cargo_bot_description/meshes/collision/lidar.stl"
+                scale="0.001 0.001 0.001"/>
+        </geometry>
+        </collision>
+        <xacro:inertial_cylinder mass="0.045" length="0.035" radius="0.035"/>
+    </link>
+
+    <joint name="lidar_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="lidar_link"/>
+        <origin xyz="0 0 0.3" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Isaac Sim RTX Lidar (Slamtec RPLIDAR S2E preset).
+         The URDF Importer in Isaac Sim 5.1+ honors this `<sensor>` tag and
+         creates the OmniLidar prim with the correct nesting under lidar_link
+         at import time (which avoids the manual Create-menu path-sanitization
+         bug observed in 5.1.0-rc.19 / GA when robot is at root namespace).
+         Reference: https://docs.isaacsim.omniverse.nvidia.com/5.1.0/importer_exporter/ext_isaacsim_asset_importer_urdf.html
+         -->
+    <sensor name="rplidar" type="ray" update_rate="5.5" isaac_sim_config="Slamtec_RPLIDAR_S2E">
+        <parent link="lidar_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </sensor>
+
+    <link name="imu_link"/>
+
+    <joint name="imu_joint" type="fixed">
+        <parent link="base_link"/>
+        <child link="imu_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+
+</robot>
