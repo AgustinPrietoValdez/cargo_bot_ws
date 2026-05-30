@@ -1,0 +1,80 @@
+ekf_filter_node:
+  ros__parameters:
+    # Frequency at which the EKF re-estimates state and publishes.
+    # 30 Hz is a good balance between resolution and CPU.
+    frequency: 30.0
+
+    # 2D mode collapses pitch, roll, z to zero — appropriate for diff-drive on flat floor.
+    # Reduces dimensionality of the filter from 15-dim to 9-dim → faster + more stable.
+    two_d_mode: true
+
+    # Publish the filtered odom → base_footprint TF. EKF is the SINGLE authority
+    # for this TF — that's why we disconnected the Isaac OmniGraph's TF publish
+    # in section 4.4.
+    publish_tf: true
+
+    # Frame conventions: REP-105
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_footprint
+    world_frame: odom    # Fusion en frame odom (no map todavía, eso es AMCL en Fase 4)
+
+    use_sim_time: true   # respect /clock from Isaac
+
+    # ─── Input 0: wheel odometry from Isaac ─────────────────────────────────
+    odom0: odom
+    # Vector of booleans indicating which state variables to FUSE from this input.
+    # Order: [x, y, z, roll, pitch, yaw, vx, vy, vz, vroll, vpitch, vyaw, ax, ay, az]
+    # We fuse ONLY vx and vyaw — the position integrated from wheel odometry drifts.
+    # The EKF integrates velocities itself, more robustly than using odom's pose.
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_queue_size: 10
+    odom0_differential: false
+    odom0_relative: false
+
+    # ─── Input 1: IMU from Isaac ─────────────────────────────────────────────
+    imu0: imu/data
+    # Fuse ABSOLUTE yaw + yaw rate + linear accel x.
+    # The absolute yaw (index 5 = true) is the HEADING ANCHOR: without it the
+    # filter dead-reckons heading by integrating vyaw and drifts (~15 deg over a
+    # session was observed — the live /scan rotated off the slam map). In Isaac
+    # the IMU orientation is computed from ground-truth physics, so it does NOT
+    # drift; on real hardware a BNO085 (internal sensor fusion) gives the same
+    # stable absolute yaw. This is the standard robot_localization diff-drive+IMU
+    # pattern. (A bare MPU6050 without magnetometer WOULD drift — switch this
+    # back to false and rely on SLAM/AMCL for heading if that's the final HW.)
+    imu0_config: [false, false, false,
+                  false, false, true,
+                  false, false, false,
+                  false, false, true,
+                  true,  false, false]
+    imu0_queue_size: 10
+    imu0_differential: false
+    imu0_relative: false
+    imu0_remove_gravitational_acceleration: true   # IMU reports g when stationary, remove it
+
+    # ─── Process noise (how much we trust the model vs sensors) ──────────────
+    # Diagonal matrix. Bigger values = more trust in sensors, less in model.
+    # These are conservative defaults; tune later if filter is too sluggish or too jumpy.
+    # NOTA: TODOS los valores son `0.0` (no `0`). El parser YAML de ROS 2 es estricto
+    #       con tipos en arrays — un solo `0` (int) mezclado con `0.05` (float)
+    #       hace fallar el load con "Sequence should be of same type".
+    process_noise_covariance: [0.05, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.05, 0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.06, 0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.03, 0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.03, 0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.06, 0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.025, 0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.025, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.04, 0.0,  0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.01, 0.0,  0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.01, 0.0,  0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.02, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.01, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.01, 0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,  0.0,  0.0,  0.0,  0.0,  0.0,  0.015]

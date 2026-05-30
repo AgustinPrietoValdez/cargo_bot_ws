@@ -34,12 +34,19 @@
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </sensor>
 
-    <link name="imu_link"/>
-
+    <link name="imu_link">
+          <xacro:inertial_box mass="0.01" x="0.02" y="0.02" z="0.005"/>
+      </link>
+      
     <joint name="imu_joint" type="fixed">
         <parent link="base_link"/>
         <child link="imu_link"/>
         <origin xyz="0 0 0" rpy="0 0 0"/>
     </joint>
+
+    <sensor name="imu" type="imu" update_rate="100">
+        <parent link="imu_link"/>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+    </sensor>
 
 </robot>
