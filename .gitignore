@@ -18,3 +18,15 @@ __pycache__/
 
 # Backups
 *.bak
+
+# Logs / generated output
+*.log
+diag_*.txt
+*_attrs.txt
+
+# tf2 view_frames exports (regenerables)
+frames_*.gv
+frames_*.pdf
+
+# Capturas sueltas en la raíz (mover a docs/ si se quieren versionar)
+/Foto_mapa*.jpg
