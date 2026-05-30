@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Roadmap & planned features (MASTER_PLAN)
+    url: https://github.com/AgustinPrietoValdez/cargo_bot_ws/blob/main/MASTER_PLAN.md
+    about: Check the phase roadmap before opening a feature request — it may already be planned.
+  - name: Phase guides (docs/)
+    url: https://github.com/AgustinPrietoValdez/cargo_bot_ws/tree/main/docs
+    about: Per-phase technical guides (DDS, URDF, Isaac scene, SLAM, Nav2, missions, hardware).
