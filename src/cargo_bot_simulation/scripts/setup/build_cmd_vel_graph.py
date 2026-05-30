@@ -12,6 +12,7 @@ import omni.usd
 import omni.kit.commands
 import omni.graph.core as og
 from pxr import Sdf
+import usdrt.Sdf
 
 GRAPH_PATH       = "/World/cargo_bot/cmd_vel_graph"
 ARTICULATION     = "/World/cargo_bot/base_footprint"
@@ -84,6 +85,26 @@ def main():
     _log(f"created graph {GRAPH_PATH} with {len(nodes)} nodes")
     for n in nodes:
         _log(f"  node: {n.get_prim_path()}")
+
+    # CRITICAL: inputs:targetPrim on IsaacArticulationController is a USD
+    # RELATIONSHIP, not an attribute. Different from IsaacReadIMU.imuPrim,
+    # which is an attribute with type=target (bindable via og.Controller.set
+    # with [usdrt.Sdf.Path(...)]). Relationships need the USD API directly:
+    # prim.GetRelationship(name).SetTargets([Sdf.Path(...)]).
+    # Confirm with prim.GetAttributes() vs prim.GetRelationships() -- targetPrim
+    # appears ONLY in the second. keys.SET_VALUES and og.Controller.set both
+    # silently fail (no exception) when called on a relationship, leaving the
+    # ArtCtrl subscribed to cmd_vel but unable to drive any joint.
+    art_ctrl_prim = stage.GetPrimAtPath(f"{GRAPH_PATH}/ArtCtrl")
+    if not art_ctrl_prim or not art_ctrl_prim.IsValid():
+        _log(f"FATAL: ArtCtrl prim missing at {GRAPH_PATH}/ArtCtrl")
+        return
+    target_rel = art_ctrl_prim.GetRelationship("inputs:targetPrim")
+    if not target_rel.IsValid():
+        target_rel = art_ctrl_prim.CreateRelationship("inputs:targetPrim")
+    target_rel.SetTargets([Sdf.Path(ARTICULATION)])
+    _log(f"bound ArtCtrl.targetPrim (USD rel) -> {ARTICULATION}")
+
     _log("DONE.  Press Play.  Test with:")
     _log(f"  ros2 topic pub /{TOPIC_CMD_VEL} geometry_msgs/Twist '{{linear: {{x: 0.2}}}}' -r 10")
 

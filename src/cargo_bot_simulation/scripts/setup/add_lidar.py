@@ -29,12 +29,31 @@ import omni.kit.commands
 import omni.usd
 from pxr import Gf
 
-# Use the BUNDLED Example_Rotary_2D config -- proven working in the standalone
-# example (publishes /scan at 15.5 Hz).  The Slamtec preset has issues in
-# 5.1.0-rc.19 where the resolver doesn't fully apply the sensor config and the
-# RTX renderer returns 0 rays.  We'll tune ranges/scan rate post-creation if
-# needed.
-CONFIG = "Example_Rotary_2D"
+# Use the SLAMTEC RPLIDAR_S2E config -- el proyecto simula un RPLidar S2E para
+# SLAM 2D. Su emitter es azimuthDeg=[0], elevationDeg=[0] (perfectamente
+# horizontal), a diferencia del Example_Rotary_2D (azimuth=1 / elevation=-2).
+# Path del perfil:
+#   exts\isaacsim.sensors.rtx\data\lidar_configs\SLAMTEC\RPLIDAR_S2E.json
+# El nombre de config = nombre de archivo sin .json (ver lidar_configs\README.md).
+CONFIG = "RPLIDAR_S2E"
+
+# ORIENTACION DEL PLANO DE BARRIDO  -> IDENTIDAD (correcto para este setup).
+#
+# HISTORIA (2026-05-30): un research-fix concluyo erroneamente que habia que
+# rotar el sensor +90deg sobre X (apoyandose en el comentario del bundled
+# rtx_lidar.py "Sensor needs to be rotated 90 degrees about X"). EN ESTA ESCENA
+# eso ROMPIO el lidar: con identidad el barrido YA es horizontal (los rayos
+# trazan un cuadrado/contorno de paredes). La rotacion +90X lo inclino y el
+# lidar pasaba a cortar el robot.
+#
+# Los sintomas que dispararon el research (linea en el piso / "cono" / mapa que
+# salta) NO eran del plano de barrido: eran (a) la escena no tenia paredes
+# alrededor -> el lidar no tenia que golpear -> cobertura parcial; y, al meter la
+# rotacion, (b) el plano quedo vertical. Con paredes agregadas + orientacion
+# identidad el mapa sale cuadrado y limpio. Verificado por el usuario.
+#
+# CONCLUSION: dejar orientacion IDENTIDAD. No rotar.
+LIDAR_ORIENT = Gf.Quatd(1.0, 0.0, 0.0, 0.0)
 # New scene namespace: robot is under /World/cargo_bot (NOT /cargo_bot)
 PARENT_LINK = "/World/cargo_bot/lidar_link"
 LIDAR_LEAF = "lidar_sensor"
@@ -107,7 +126,7 @@ def main():
         parent=PARENT_LINK,
         config=CONFIG,
         translation=Gf.Vec3d(0.0, 0.0, 0.0),   # inherit lidar_link's transform
-        orientation=Gf.Quatd(1.0, 0.0, 0.0, 0.0),
+        orientation=LIDAR_ORIENT,               # +90 deg X -> plano de barrido HORIZONTAL
     )
     if not result:
         _log(f"FATAL: command returned result=False.")
