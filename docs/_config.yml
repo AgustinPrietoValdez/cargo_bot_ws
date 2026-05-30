@@ -1,0 +1,14 @@
+title: cargo_bot
+description: Autonomous indoor cargo robot — ROS 2 Humble + NVIDIA Isaac Sim (SLAM · EKF · Nav2)
+theme: jekyll-theme-cayman
+show_downloads: false
+
+# Solo publicamos la landing (index.md). Las guías internas en español
+# (FASE*, GITHUB_WORKFLOW) quedan en el repo pero NO se publican como páginas
+# — evita además cualquier conflicto de Liquid con el YAML de las guías.
+exclude:
+  - FASE1_GUIA_URDF.md
+  - FASE2_GUIA_ISAAC_SIM.md
+  - FASE3_GUIA_SLAM.md
+  - FASE4_GUIA_NAV2.md
+  - GITHUB_WORKFLOW.md
