@@ -1,0 +1,31 @@
+ name: Announce release on LinkedIn
+
+  on:
+    release:
+      types: [published]
+    workflow_dispatch:
+      inputs:
+        dry_run:
+          description: "Preview without publishing"
+          type: boolean
+          default: true
+
+  jobs:
+    announce:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-python@v5
+          with:
+            python-version: "3.11"
+        - run: pip install requests
+        - name: Publish to LinkedIn
+          env:
+            LINKEDIN_ACCESS_TOKEN: ${{ secrets.LINKEDIN_ACCESS_TOKEN }}
+            LINKEDIN_AUTHOR_URN: ${{ secrets.LINKEDIN_AUTHOR_URN }}
+            RELEASE_TITLE: ${{ github.event.release.name }}
+            RELEASE_BODY: ${{ github.event.release.body }}
+            RELEASE_URL: ${{ github.event.release.html_url }}
+            HASHTAGS: "#robotics #ROS2 #SLAM #Nav2 #opensource"
+            DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+          run: python .github/scripts/announce_linkedin.py
