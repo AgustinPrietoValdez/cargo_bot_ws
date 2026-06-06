@@ -54,6 +54,24 @@ cada cosa que hacés. Simple, rápido, y te enseña la disciplina de PRs sin la
 burocracia. Es el flujo que usa GitHub internamente y el estándar de facto en
 proyectos open source modernos.
 
+### 1b. Granularidad: una branch por TAREA (regla fija, 2026-06-06)
+
+La unidad de branching es la **tarea de la app Plan**, ni más chica ni más grande:
+
+| Nivel | Unidad git | Por qué |
+|---|---|---|
+| **Subtarea** | Un **commit** (Conventional Commit) dentro de la branch | Una branch+PR por checkbox sería puro overhead; el detalle fino vive en los commits del PR |
+| **Tarea** | Una **branch + PR** (squash al completarla) | Tamaño justo: revisable, revertible de a 1 commit en `main`, y mapea 1:1 con el board de Plan |
+| **Fase** | Un **tag/release** al cerrar (`v0.X-<tema>`) + **post manual** en LinkedIn (Claude draftea EN/ES, vos publicás) | El hito grande se marca, no se branchea |
+
+- Nombre de branch derivado de la tarea: ej. tarea "Nav2 tuning + waypoints" →
+  `feat/fase4-nav2-tuning`.
+- Trabajo meta suelto (docs, tooling, configs) que no es una tarea de Plan: branch
+  `docs/...`/`chore/...` cortita + PR igual. **Nada directo a `main`** (la protección
+  existe para eso; no se bypasea).
+- **Review previa (regla 2026-06-06):** antes de commitear o abrir una PR, Claude avisa
+  y se revisan los cambios juntos (qué archivos + resumen del diff). Sin OK no hay commit.
+
 ---
 
 ## 2. Naming de branches
