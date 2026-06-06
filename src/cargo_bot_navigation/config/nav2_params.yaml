@@ -1,0 +1,284 @@
+amcl:
+  ros__parameters:
+    use_sim_time: True                # 👈 obligatorio en TODOS los nodos (ver 3.9)
+    base_frame_id: "base_footprint"   # 👈 NO base_link — tu URDF usa base_footprint
+    odom_frame_id: "odom"
+    global_frame_id: "map"
+    scan_topic: "/scan_fixed"         # 👈 NO /scan
+    set_initial_pose: true            # 👈 AMCL se auto-ubica al arrancar (sim)
+    initial_pose:                     # 👈 pose de spawn del robot en coords del mapa
+      x: 0.0
+      y: 0.0
+      z: 0.0
+      yaw: 0.0
+    # --- params de filtro de partículas (defaults sanos de Humble) ---
+    max_particles: 2000
+    min_particles: 500
+    laser_max_range: 12.0             # alineado con el lidar S2E (~12 m)
+    laser_min_range: -1.0             # -1 = usa el range_min del propio scan
+    laser_model_type: "likelihood_field"
+    max_beams: 60
+    alpha1: 0.2                       # ruido rot→rot del modelo de odometría
+    alpha2: 0.2                       # ruido trans→rot
+    alpha3: 0.2                       # ruido trans→trans
+    alpha4: 0.2                       # ruido rot→trans
+    alpha5: 0.2                       # ruido strafe (solo holonómico)
+    robot_model_type: "nav2_amcl::DifferentialMotionModel"   # 👈 diff-drive
+    update_min_a: 0.2                 # rad mínimos de giro para actualizar el filtro
+    update_min_d: 0.25                # m mínimos de avance para actualizar
+    resample_interval: 1
+    transform_tolerance: 1.0
+    tf_broadcast: true                # AMCL emite map→odom
+    z_hit: 0.5
+    z_rand: 0.5
+    sigma_hit: 0.2
+
+map_server:
+  ros__parameters:
+    use_sim_time: True
+    yaml_filename: ""    # 👈 lo seteamos desde el launch (path absoluto del install)
+    topic_name: "map"
+    frame_id: "map"
+
+planner_server:
+  ros__parameters:
+    use_sim_time: True
+    expected_planner_frequency: 20.0
+    planner_plugins: ["GridBased"]
+    GridBased:
+      plugin: "nav2_navfn_planner/NavfnPlanner"   # 👈 NavFn
+      tolerance: 0.5          # m: si no llega exacto al goal, acepta a 0.5 m
+      use_astar: false        # false = Dijkstra (explora parejo). true = A* (más rápido)
+      allow_unknown: true     # puede planear a través de celdas "desconocidas"
+
+controller_server:
+  ros__parameters:
+    use_sim_time: True
+    controller_frequency: 20.0
+    min_x_velocity_threshold: 0.001
+    min_y_velocity_threshold: 0.5
+    min_theta_velocity_threshold: 0.001
+    failure_tolerance: 0.3
+    progress_checker_plugin: "progress_checker"
+    goal_checker_plugins: ["general_goal_checker"]
+    controller_plugins: ["FollowPath"]
+
+    progress_checker:
+      plugin: "nav2_controller::SimpleProgressChecker"
+      required_movement_radius: 0.5     # si no se mueve 0.5 m en...
+      movement_time_allowance: 10.0     # ...10 s → aborta (atascado)
+
+    general_goal_checker:
+      stateful: True
+      plugin: "nav2_controller::SimpleGoalChecker"
+      xy_goal_tolerance: 0.25           # m: cuán cerca del goal cuenta como "llegó"
+      yaw_goal_tolerance: 0.25          # rad: tolerancia de heading final
+
+    FollowPath:
+      plugin: "dwb_core::DWBLocalPlanner"   # 👈 DWB
+      # --- límites de velocidad (BAJADOS de los defaults de TB3) ---
+      min_vel_x: 0.0
+      max_vel_x: 0.26                   # m/s — robot chico en cuarto chico
+      min_vel_y: 0.0
+      max_vel_y: 0.0                    # 👈 0 — diff-drive NO estrafea
+      max_vel_theta: 1.0                # rad/s
+      min_speed_xy: 0.0
+      max_speed_xy: 0.26
+      min_speed_theta: 0.0
+      acc_lim_x: 2.5
+      acc_lim_y: 0.0
+      acc_lim_theta: 3.2
+      decel_lim_x: -2.5
+      decel_lim_y: 0.0
+      decel_lim_theta: -3.2
+      # --- muestreo de trayectorias ---
+      vx_samples: 20
+      vy_samples: 5
+      vtheta_samples: 20
+      sim_time: 1.7                     # s de horizonte por trayectoria simulada
+      linear_granularity: 0.05
+      angular_granularity: 0.025
+      transform_tolerance: 0.2
+      xy_goal_tolerance: 0.25
+      trans_stopped_velocity: 0.25
+      short_circuit_trajectory_evaluation: True
+      stateful: True
+      # --- critics: cómo puntúa cada trayectoria candidata ---
+      critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign",
+                "PathAlign", "PathDist", "GoalDist"]
+      BaseObstacle.scale: 0.02
+      PathAlign.scale: 32.0             # ↑ subir esto = sigue más fiel el path (menos pivoteo)
+      PathAlign.forward_point_distance: 0.1
+      GoalAlign.scale: 24.0
+      GoalAlign.forward_point_distance: 0.1
+      PathDist.scale: 32.0
+      GoalDist.scale: 24.0
+      RotateToGoal.scale: 32.0          # critic que hace girar en el lugar al final
+      RotateToGoal.slowing_factor: 5.0
+      RotateToGoal.lookahead_time: -1.0
+
+
+behavior_server:
+  ros__parameters:
+    use_sim_time: True
+    costmap_topic: local_costmap/costmap_raw
+    footprint_topic: local_costmap/published_footprint
+    cycle_frequency: 10.0
+    behavior_plugins: ["spin", "backup", "drive_on_heading", "assisted_teleop", "wait"]
+    spin:
+      plugin: "nav2_behaviors/Spin"            # 👈 forma con "/" (Humble), NO "::"
+    backup:
+      plugin: "nav2_behaviors/BackUp"
+    drive_on_heading:
+      plugin: "nav2_behaviors/DriveOnHeading"
+    wait:
+      plugin: "nav2_behaviors/Wait"
+    assisted_teleop:
+      plugin: "nav2_behaviors/AssistedTeleop"
+    global_frame: odom
+    robot_base_frame: base_footprint          # 👈 NO base_link
+    transform_tolerance: 0.1
+    simulate_ahead_time: 2.0
+    max_rotational_vel: 1.0
+    min_rotational_vel: 0.4
+    rotational_acc_lim: 3.2
+
+bt_navigator:
+  ros__parameters:
+    use_sim_time: True
+    global_frame: map
+    robot_base_frame: base_footprint          # 👈 NO base_link
+    odom_topic: /odometry/filtered            # 👈 usamos el output del EKF, no /odom crudo
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    # dejamos default_nav_to_pose_bt_xml VACÍO → usa el BT default de Humble
+    # (navigate_to_pose_w_replanning_and_recovery.xml)
+    plugin_lib_names:
+      - nav2_compute_path_to_pose_action_bt_node
+      - nav2_compute_path_through_poses_action_bt_node
+      - nav2_smooth_path_action_bt_node
+      - nav2_follow_path_action_bt_node
+      - nav2_spin_action_bt_node
+      - nav2_wait_action_bt_node
+      - nav2_assisted_teleop_action_bt_node
+      - nav2_back_up_action_bt_node
+      - nav2_drive_on_heading_bt_node
+      - nav2_clear_costmap_service_bt_node
+      - nav2_is_stuck_condition_bt_node
+      - nav2_goal_reached_condition_bt_node
+      - nav2_goal_updated_condition_bt_node
+      - nav2_globally_updated_goal_condition_bt_node
+      - nav2_is_path_valid_condition_bt_node
+      - nav2_initial_pose_received_condition_bt_node
+      - nav2_reinitialize_global_localization_service_bt_node
+      - nav2_rate_controller_bt_node
+      - nav2_distance_controller_bt_node
+      - nav2_speed_controller_bt_node
+      - nav2_truncate_path_action_bt_node
+      - nav2_truncate_path_local_action_bt_node
+      - nav2_goal_updater_node_bt_node
+      - nav2_recovery_node_bt_node
+      - nav2_pipeline_sequence_bt_node
+      - nav2_round_robin_node_bt_node
+      - nav2_transform_available_condition_bt_node
+      - nav2_time_expired_condition_bt_node
+      - nav2_path_expiring_timer_condition
+      - nav2_distance_traveled_condition_bt_node
+      - nav2_single_trigger_bt_node
+      - nav2_goal_updated_controller_bt_node
+      - nav2_is_battery_low_condition_bt_node
+      - nav2_navigate_through_poses_action_bt_node
+      - nav2_navigate_to_pose_action_bt_node
+      - nav2_remove_passed_goals_action_bt_node
+      - nav2_planner_selector_bt_node
+      - nav2_controller_selector_bt_node
+      - nav2_goal_checker_selector_bt_node
+      - nav2_controller_cancel_bt_node
+      - nav2_path_longer_on_approach_bt_node
+      - nav2_wait_cancel_bt_node
+      - nav2_spin_cancel_bt_node
+      - nav2_back_up_cancel_bt_node
+      - nav2_assisted_teleop_cancel_bt_node
+      - nav2_drive_on_heading_cancel_bt_node
+      - nav2_is_battery_charging_condition_bt_node
+
+# 👈 estos DOS nodos hijos necesitan use_sim_time aparte (los más olvidados)
+bt_navigator_navigate_through_poses_rclcpp_node:
+  ros__parameters:
+    use_sim_time: True
+bt_navigator_navigate_to_pose_rclcpp_node:
+  ros__parameters:
+    use_sim_time: True
+
+global_costmap:
+  global_costmap:                       # 👈 doble anidado a propósito (es real)
+    ros__parameters:
+      use_sim_time: True
+      update_frequency: 1.0
+      publish_frequency: 1.0
+      global_frame: map
+      robot_base_frame: base_footprint  # 👈 NO base_link
+      robot_radius: 0.18                # robot ~0.3 m de diámetro → radio ~0.18
+      resolution: 0.05                  # = resolución del mapa guardado
+      track_unknown_space: true
+      plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+      static_layer:
+        plugin: "nav2_costmap_2d::StaticLayer"
+        map_subscribe_transient_local: True
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan_fixed            # 👈 NO /scan
+          sensor_frame: lidar_link
+          data_type: "LaserScan"
+          max_obstacle_height: 2.0
+          min_obstacle_height: 0.0
+          clearing: True
+          marking: True
+          obstacle_max_range: 5.0       # cap < 12 m del lidar (marca dentro del cuarto)
+          obstacle_min_range: 0.0
+          raytrace_max_range: 6.0       # ≥ obstacle_max_range (limpia antes de re-marcar)
+          raytrace_min_range: 0.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.35          # 👈 NO el default 0.55 (tapia el cuarto)
+      always_send_full_costmap: True
+
+local_costmap:
+  local_costmap:
+    ros__parameters:
+      use_sim_time: True
+      update_frequency: 5.0
+      publish_frequency: 2.0
+      global_frame: odom
+      robot_base_frame: base_footprint  # 👈 NO base_link
+      rolling_window: true
+      width: 3                          # ventana 3x3 m que sigue al robot
+      height: 3
+      resolution: 0.05
+      robot_radius: 0.18
+      plugins: ["obstacle_layer", "inflation_layer"]   # 👈 obstacle_layer, NO voxel_layer
+      obstacle_layer:
+        plugin: "nav2_costmap_2d::ObstacleLayer"
+        enabled: True
+        observation_sources: scan
+        scan:
+          topic: /scan_fixed            # 👈 NO /scan (acá también)
+          sensor_frame: lidar_link
+          data_type: "LaserScan"
+          max_obstacle_height: 2.0
+          min_obstacle_height: 0.0
+          clearing: True
+          marking: True
+          obstacle_max_range: 5.0
+          obstacle_min_range: 0.0
+          raytrace_max_range: 6.0
+          raytrace_min_range: 0.0
+      inflation_layer:
+        plugin: "nav2_costmap_2d::InflationLayer"
+        cost_scaling_factor: 3.0
+        inflation_radius: 0.35          # 👈 igual que el global
+      always_send_full_costmap: True

@@ -1,0 +1,11 @@
+twist_mux:
+  ros__parameters:
+    use_sim_time: true
+    topics:
+      navigation:
+        topic: cmd_vel_nav     # 👈 entrada de Nav2 (el controller publica acá)
+        timeout: 0.5           # s sin mensajes → twist_mux deja de pasar este input
+        priority: 10           # mayor número = mayor prioridad
+    # En 4b vamos a sumar inputs de mayor prioridad acá:
+    #   joystick: { topic: cmd_vel_joy, timeout: 0.5, priority: 100 }
+    #   emergency: { topic: cmd_vel_estop, timeout: 0.5, priority: 255 }
