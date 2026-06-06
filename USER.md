@@ -27,8 +27,8 @@ espejo; la fuente de verdad es el issue.
 
 ```bash
 # Ver mis tareas del proyecto (desde Windows)
-python tools/plan_cli.py show -p CARGO_BOT
-python tools/plan_cli.py task "tuning"
+python "C:\Users\agusp\Documentos\Organization_App\calendar-app\tools\plan_cli.py" show -p CARGO_BOT
+python "C:\Users\agusp\Documentos\Organization_App\calendar-app\tools\plan_cli.py" task "tuning"
 ```
 
 ## Boot completo del stack (navegacion sobre cuarto_v1)
