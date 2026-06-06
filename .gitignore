@@ -27,6 +27,12 @@ diag_*.txt
 # tf2 view_frames exports (regenerables)
 frames_*.gv
 frames_*.pdf
+frames.gv
+frames.pdf
 
 # Capturas sueltas en la raíz (mover a docs/ si se quieren versionar)
 /Foto_mapa*.jpg
+
+# Notas internas de Claude (no son para el lector del repo)
+_claude/
+AI.md
