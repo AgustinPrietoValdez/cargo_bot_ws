@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 03 - URDF and xacro: describing the robot</title>
+<link rel="stylesheet" href="lectures.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="lec">
+  <div class="kicker">Lecture 03 &middot; Phase 1 &middot; Robot description</div>
+  <h1>Describing the robot: URDF and xacro</h1>
+</header>
+
+<p class="goal">
+  <b>Learning goal.</b> Understand how a robot is described to ROS as a <b>tree of links and
+  joints</b>, why we author it in <b>xacro</b> (not raw URDF), what <b>inertias</b> are for, and
+  the <code>base_footprint</code>/<code>base_link</code> convention. Then read cargo_bot's model
+  and know why the wheels once "froze".
+</p>
+
+<div class="toc">
+  <strong>In this lecture</strong>
+  1. Why a robot model &nbsp;&bull;&nbsp; 2. Links &amp; joints &nbsp;&bull;&nbsp; 3. The cargo_bot tree &nbsp;&bull;&nbsp;
+  4. base_footprint vs base_link &nbsp;&bull;&nbsp; 5. Inertias &nbsp;&bull;&nbsp; 6. Why xacro &nbsp;&bull;&nbsp;
+  7. Isaac import &amp; frozen wheels &nbsp;&bull;&nbsp; 8. Quiz &nbsp;&bull;&nbsp; 9. Sources
+</div>
+
+<h2>1. Why a robot model at all?</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Before simulating, localizing or navigating, every piece of software must agree on the
+  robot's <b>geometry and kinematics</b>: where the lidar sits relative to the wheels, the wheel
+  separation, where the robot's "center" is on the floor. <b>URDF (Unified Robot Description
+  Format)</b> is the XML that encodes this. From it, ROS publishes the <b>TF tree</b> &mdash; the
+  live transforms between frames that SLAM, Nav2 and RViz all rely on.</p>
+</div>
+<p>If the URDF is wrong (wheel separation off, lidar misplaced), everything downstream is subtly
+wrong: odometry drifts, the scan does not line up with the map. Foundational, not cosmetic.</p>
+
+<h2>2. The two building blocks: links and joints</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <ul>
+    <li><b>&lt;link&gt;</b> = a rigid body. Up to three parts: <b>visual</b> (the mesh you see),
+      <b>collision</b> (shape for physics, often simpler), <b>inertial</b> (mass + inertia +
+      center of mass).</li>
+    <li><b>&lt;joint&gt;</b> = how two links connect (a <em>parent</em> and a <em>child</em>). Its
+      <b>type</b> sets the allowed motion: <code>fixed</code> (rigid), <code>continuous</code>
+      (unlimited rotation &mdash; drive wheels), <code>revolute</code> (limited rotation &mdash; a
+      hatch), <code>prismatic</code> (slide).</li>
+  </ul>
+  <p>The model is a <b>tree</b>: exactly one root, no cycles.</p>
+</div>
+
+<h2>3. The cargo_bot tree</h2>
+<figure class="diagram">
+<svg viewBox="0 0 720 300" role="img" aria-label="cargo_bot link/joint tree">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/></marker></defs>
+  <rect class="n-node" x="20" y="130" width="140" height="40" rx="8"/><text class="n-label" x="90" y="155" text-anchor="middle">base_footprint</text>
+  <rect class="n-node" x="220" y="130" width="120" height="40" rx="8"/><text class="n-label" x="280" y="155" text-anchor="middle">base_link</text>
+  <rect class="n-node" x="470" y="10"  width="160" height="36" rx="8"/><text class="n-label" x="550" y="33" text-anchor="middle">left_wheel_link</text>
+  <rect class="n-node" x="470" y="58"  width="160" height="36" rx="8"/><text class="n-label" x="550" y="81" text-anchor="middle">right_wheel_link</text>
+  <rect class="n-node" x="470" y="106" width="160" height="36" rx="8"/><text class="n-label" x="550" y="129" text-anchor="middle">caster_wheel_link</text>
+  <rect class="n-node" x="470" y="154" width="160" height="36" rx="8"/><text class="n-label" x="550" y="177" text-anchor="middle">lidar_link</text>
+  <rect class="n-node" x="470" y="202" width="160" height="36" rx="8"/><text class="n-label" x="550" y="225" text-anchor="middle">imu_link</text>
+  <line class="e-line" x1="160" y1="150" x2="220" y2="150"/>
+  <text class="e-label" x="190" y="143" text-anchor="middle">fixed</text>
+  <line class="e-line" x1="340" y1="150" x2="470" y2="28"/>
+  <line class="e-line" x1="340" y1="150" x2="470" y2="76"/>
+  <line class="e-line" x1="340" y1="150" x2="470" y2="124"/>
+  <line class="e-line" x1="340" y1="150" x2="470" y2="172"/>
+  <line class="e-line" x1="340" y1="150" x2="470" y2="220"/>
+  <text class="e-label" x="392" y="60">continuous (wheels)</text>
+  <text class="e-label" x="392" y="248">fixed (sensors, caster)</text>
+</svg>
+<figcaption>The robot is a tree of links joined by typed joints. Wheels = continuous; sensors and
+caster = fixed.</figcaption>
+</figure>
+
+<h2>4. base_footprint vs base_link (a convention that matters)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><b>base_link</b> = the physical body frame (origin at the chassis). <b>base_footprint</b> = a
+  frame on the <b>ground</b> directly under the robot, no roll/pitch &mdash; the robot's "shadow".
+  Navigation reasons in 2D on the floor, so it wants a clean ground-level reference that does not
+  bob with the chassis.</p>
+</div>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>The whole Nav2/AMCL stack is configured with <code>robot_base_frame: base_footprint</code>
+  (NOT <code>base_link</code>) &mdash; the detail flagged all over the Phase 4 config. The fixed
+  <code>base_footprint &rarr; base_link</code> joint encodes the chassis height. Follows
+  <a href="https://www.ros.org/reps/rep-0105.html">REP-105</a>.</p>
+</div>
+
+<h2>5. Inertias: the part beginners skip and regret</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>The <code>&lt;inertial&gt;</code> block (mass, center of mass, 3&times;3 inertia tensor) is
+  ignored by RViz but <b>critical for physics</b> (Isaac). Zero or nonsensical inertia &rarr; the
+  robot jitters, flips or explodes in sim.</p>
+</div>
+<div class="box deep">
+  <span class="tag">Deeper</span>
+  <p>Computing inertia tensors by hand for every shape is tedious, so the project uses
+  <b>xacro macros</b> (<code>inertial_macros.xacro</code>: <code>xacro:inertial_box</code>,
+  <code>inertial_cylinder</code>&hellip;) that compute the tensor from mass + dimensions. You call
+  the macro; it fills in the math.</p>
+</div>
+
+<h2>6. Why xacro instead of raw URDF</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Raw URDF is verbose and repetitive. <b>xacro</b> (XML Macros) adds
+  <b>&lt;xacro:property&gt;</b> (variables like <code>wheel_radius</code>),
+  <b>&lt;xacro:macro&gt;</b> (reusable blocks, e.g. one <code>wheel</code> macro called
+  left/right), and <b>&lt;xacro:include&gt;</b> (split across files).</p>
+</div>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>Split for clarity: <code>cargo_bot.urdf.xacro</code> (top, the <b>source of truth</b>) includes
+  <code>chassis.xacro</code>, <code>wheels.xacro</code>, <code>sensors.xacro</code>,
+  <code>inertial_macros.xacro</code>. xacro is not a runtime format &mdash; it must be expanded:</p>
+  <pre><code>xacro src/cargo_bot_description/urdf/cargo_bot.urdf.xacro &gt; /tmp/cargo_bot.urdf
+check_urdf /tmp/cargo_bot.urdf      # sanity-check the tree</code></pre>
+  <p>In launch files, <code>robot_state_publisher</code> expands it live (the
+  <code>Command(['xacro ', ...])</code> substitution) and publishes <code>/robot_description</code>
+  plus the fixed-joint TF.</p>
+</div>
+
+<h2>7. The Isaac import path (and the frozen-wheels gotcha)</h2>
+<p>Isaac cannot import xacro directly. The Phase 2 workflow: expand to a flat URDF, fix mesh paths
+for Windows, import that (the generated <code>cargo_bot_isaac.urdf</code> at the repo root &mdash;
+a generated artifact, not a source).</p>
+<div class="box gotcha">
+  <span class="tag">Trap &mdash; frozen wheels</span>
+  <p>After import the robot accepted <code>/cmd_vel</code> but the wheels did not turn. Cause: the
+  wheel joint's PhysX velocity drive had <code>damping=0, stiffness=0</code> &rarr; no torque
+  applied. Fix (<code>scripts/maintenance/fix_wheel_drives.py</code>): <code>damping=1000,
+  stiffness=0</code>, type=force. Moral: a model that is <em>kinematically</em> correct can be
+  <em>dynamically</em> dead if the drive params are wrong.</p>
+</div>
+
+<h2>8. Quiz (self-grading)</h2>
+<div class="quiz" id="quiz"></div>
+
+<h2>9. Go deeper (official sources)</h2>
+<ul class="src">
+  <li>URDF main tutorial: <a href="https://docs.ros.org/en/humble/Tutorials/Intermediate/URDF/URDF-Main.html">docs.ros.org</a></li>
+  <li>xacro: <a href="http://wiki.ros.org/xacro">wiki.ros.org/xacro</a> &middot; URDF XML: <a href="http://wiki.ros.org/urdf/XML">wiki.ros.org/urdf/XML</a></li>
+  <li>REP-105 (frames): <a href="https://www.ros.org/reps/rep-0105.html">ros.org/reps/rep-0105</a></li>
+</ul>
+
+<div class="next"><b>Next lecture &rarr;</b> <code>LECTURE_04_isaac_sensors.html</code> &mdash; putting
+the robot into Isaac Sim and wiring its sensors to ROS2 with OmniGraph.</div>
+
+</div>
+<script src="lectures.js"></script>
+<script>
+renderQuiz('quiz', [
+  { q: 'What are a link’s three sub-parts, and which does RViz ignore but Isaac needs?',
+    options: ['visual, collision, inertial — Isaac needs inertial', 'mass, color, name — Isaac needs color', 'parent, child, axis — Isaac needs axis'],
+    answer: 0, explain: 'visual (seen), collision (physics shape), inertial (mass/inertia). Inertial is vital for the physics engine.' },
+  { q: 'Why does the robot have both base_link and base_footprint?',
+    options: ['They are the same thing', 'base_footprint is a clean ground-level 2D frame for navigation; base_link is the chassis body frame', 'base_footprint is only for RViz colors'],
+    answer: 1, explain: 'Nav2 reasons in 2D on the floor, so it uses base_footprint.' },
+  { q: 'What does xacro give you over raw URDF?',
+    options: ['Nothing, it is the same', 'Variables (property), reusable macros, and includes — less repetition', 'It runs the robot directly without expansion'],
+    answer: 1, explain: 'xacro must still be expanded to plain URDF before use.' },
+  { q: 'You edited cargo_bot.urdf.xacro. What produces the plain URDF and checks it?',
+    options: ['ros2 run — it auto-loads xacro', 'xacro ... > file.urdf, then check_urdf file.urdf', 'colcon build only'],
+    answer: 1, explain: 'xacro expands; check_urdf validates the tree.' },
+  { q: 'Wheels do not spin in Isaac even though /cmd_vel arrives. Likely cause?',
+    options: ['Wrong topic name', 'Wheel joint drive had damping=0/stiffness=0 — PhysX applied no torque', 'The map is missing'],
+    answer: 1, explain: 'Fixed by setting damping=1000, stiffness=0 (force drive).' }
+]);
+</script>
+</body>
+</html>

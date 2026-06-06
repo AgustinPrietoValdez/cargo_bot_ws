@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 05 - SLAM, the EKF and the TF tree</title>
+<link rel="stylesheet" href="lectures.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="lec">
+  <div class="kicker">Lecture 05 &middot; Phase 3 &middot; Mapping &amp; localization</div>
+  <h1>SLAM, the EKF and the TF tree</h1>
+</header>
+
+<p class="goal">
+  <b>Learning goal.</b> Understand what SLAM solves, how <code>slam_toolbox</code> builds an
+  occupancy-grid map, why we fuse wheel odometry + IMU with an <b>EKF</b>, and how the TF tree
+  splits authority across <code>map &rarr; odom &rarr; base_footprint</code>. Then know why the
+  project anchors yaw to the IMU and why exactly one node may publish each TF edge.
+</p>
+
+<div class="toc">
+  <strong>In this lecture</strong>
+  1. What SLAM solves &nbsp;&bull;&nbsp; 2. slam_toolbox &nbsp;&bull;&nbsp; 3. Why an EKF &nbsp;&bull;&nbsp;
+  4. The TF tree &amp; authority &nbsp;&bull;&nbsp; 5. cargo_bot gotchas &nbsp;&bull;&nbsp; 6. End of Phase 3 &nbsp;&bull;&nbsp;
+  7. Quiz &nbsp;&bull;&nbsp; 8. Sources
+</div>
+
+<h2>1. The problem SLAM solves</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><b>SLAM = Simultaneous Localization And Mapping.</b> A chicken-and-egg problem: to build a map
+  you need to know where you are; to know where you are you need a map. SLAM does both at once
+  &mdash; as the robot moves, it incrementally builds a map <em>and</em> estimates its pose in it,
+  from the lidar (<code>/scan_fixed</code>) plus a motion estimate (odometry).</p>
+</div>
+<p>cargo_bot runs SLAM <b>once</b> to produce the saved map (<code>cuarto_v1</code>), then switches
+to pure localization (AMCL, Lecture 06). SLAM and AMCL are never run together (both own
+<code>map &rarr; odom</code>).</p>
+
+<h2>2. slam_toolbox: scan-matching into an occupancy grid</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <ul>
+    <li><b>Scan matching</b>: align each new lidar scan against the accumulated map to estimate
+      motion more precisely than odometry alone.</li>
+    <li><b>Occupancy grid</b>: a 2D array where each cell is free / occupied / unknown &mdash; the
+      <code>/map</code>, saved as <code>cuarto_v1.pgm</code> (image) + <code>.yaml</code>
+      (resolution, origin, thresholds).</li>
+    <li><b>Loop closure</b>: when the robot revisits a place it recognizes it and corrects
+      accumulated drift, snapping the map consistent.</li>
+  </ul>
+  <p>slam_toolbox publishes the <b><code>map &rarr; odom</code></b> transform &mdash; the correction
+  between drifting odometry and the true map.</p>
+</div>
+
+<h2>3. Why an EKF: fusing odometry + IMU</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Wheel <b>odometry</b> drifts (slip, imperfect radii), especially in heading. An <b>IMU</b>
+  gives angular velocity/orientation directly but drifts in position. Neither alone is enough. The
+  <b>Extended Kalman Filter</b> (<code>robot_localization</code>'s <code>ekf_node</code>)
+  <b>fuses</b> them, weighting each by its uncertainty, and outputs the
+  <b><code>odom &rarr; base_footprint</code></b> transform (smooth, locally accurate) plus
+  <code>/odometry/filtered</code>.</p>
+  <p>So localization is layered: <b>EKF gives smooth local pose; SLAM/AMCL correct global drift on
+  top.</b></p>
+</div>
+
+<h2>4. The TF tree: one publisher per edge</h2>
+<p>This is the rule that ties everything together and the #1 source of "the robot jumps in the
+map" bugs.</p>
+<figure class="diagram">
+<svg viewBox="0 0 760 250" role="img" aria-label="TF tree with authority">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/></marker></defs>
+  <rect class="n-node" x="20"  y="100" width="90"  height="40" rx="8"/><text class="n-label" x="65"  y="125" text-anchor="middle">map</text>
+  <rect class="n-node" x="200" y="100" width="90"  height="40" rx="8"/><text class="n-label" x="245" y="125" text-anchor="middle">odom</text>
+  <rect class="n-node" x="380" y="100" width="150" height="40" rx="8"/><text class="n-label" x="455" y="125" text-anchor="middle">base_footprint</text>
+  <rect class="n-node" x="610" y="100" width="120" height="40" rx="8"/><text class="n-label" x="670" y="125" text-anchor="middle">base_link</text>
+  <line class="e-line" x1="110" y1="120" x2="200" y2="120"/>
+  <text class="e-label" x="155" y="112" text-anchor="middle">AMCL / SLAM</text>
+  <line class="e-line" x1="290" y1="120" x2="380" y2="120"/>
+  <text class="e-label" x="335" y="112" text-anchor="middle">EKF</text>
+  <line class="e-line" x1="530" y1="120" x2="610" y2="120"/>
+  <text class="e-label" x="570" y="112" text-anchor="middle">Isaac</text>
+  <text class="n-sub" x="670" y="175" text-anchor="middle">&rarr; wheels, lidar, imu</text>
+  <line class="e-line" x1="670" y1="140" x2="670" y2="165"/>
+</svg>
+<figcaption>Each arrow has exactly ONE publisher. Mix them up and TF gets contradictory
+transforms &mdash; the robot "teleports".</figcaption>
+</figure>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <ul>
+    <li><code>map &rarr; odom</code>: SLAM (mapping) <b>or</b> AMCL (localizing) &mdash; never both.</li>
+    <li><code>odom &rarr; base_footprint</code>: the <b>EKF</b>. Never touched by SLAM/AMCL.</li>
+    <li><code>base_link &rarr; sensors/wheels</code>: <b>Isaac</b> / robot_state_publisher (URDF).</li>
+  </ul>
+  <p>Two publishers on one edge &rarr; contradictory transforms &rarr; visible "teleporting"/
+  oscillation. This is exactly why slam_toolbox and AMCL never run together.</p>
+</div>
+
+<h2>5. cargo_bot-specific gotchas</h2>
+<div class="box gotcha">
+  <span class="tag">Traps that cost real time</span>
+  <ul>
+    <li><b>EKF yaw anchor.</b> <code>ekf.yaml</code> fuses the IMU's <em>absolute</em> yaw as a
+      heading anchor; without it the live scan drifted ~15&deg; from the map. Valid in sim and with
+      a BNO085-class IMU; with a raw MPU6050 you would disable it and anchor heading via SLAM/AMCL.</li>
+    <li><b>The lidar "disaster".</b> A suggested +90&deg;-X rotation <em>broke</em> the lidar; the
+      real cause of the garbage map was a scene with <b>no walls</b>. Fix: add walls + keep
+      identity orientation.</li>
+    <li><b>1066 vs 1067</b> scan count &rarr; <code>scan_angle_fixer</code> (Lecture 04).</li>
+    <li><b>Stop/Play resets <code>/clock</code></b> &rarr; the EKF loses time continuity and dies;
+      Ctrl+C and relaunch.</li>
+  </ul>
+</div>
+
+<h2>6. The end state of Phase 3</h2>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>Isaac publishes <code>/scan /odom /imu/data /clock</code>; <code>scan_angle_fixer</code> gives
+  <code>/scan_fixed</code>; the EKF publishes <code>odom &rarr; base_footprint</code> +
+  <code>/odometry/filtered</code>; slam_toolbox built and we saved
+  <code>cuarto_v1.{pgm,yaml}</code>. That saved map is the input to Phase 4 localization (AMCL).</p>
+</div>
+
+<h2>7. Quiz (self-grading)</h2>
+<div class="quiz" id="quiz"></div>
+
+<h2>8. Go deeper (official sources)</h2>
+<ul class="src">
+  <li>slam_toolbox: <a href="https://github.com/SteveMacenski/slam_toolbox">github.com/SteveMacenski/slam_toolbox</a></li>
+  <li>Nav2 docs (SLAM + localization): <a href="https://docs.nav2.org/">docs.nav2.org</a></li>
+  <li>robot_localization (EKF): <a href="http://docs.ros.org/en/noetic/api/robot_localization/html/index.html">docs.ros.org</a></li>
+  <li>tf2: <a href="https://docs.ros.org/en/humble/Concepts/Intermediate/About-Tf2.html">docs.ros.org</a></li>
+</ul>
+
+<div class="next"><b>Next lecture &rarr;</b> <code>LECTURE_06_nav2_core.html</code> &mdash; the full Nav2
+navigation stack: AMCL, costmaps, planner, controller, lifecycle, behavior trees.</div>
+
+</div>
+<script src="lectures.js"></script>
+<script>
+renderQuiz('quiz', [
+  { q: 'Why is SLAM "chicken-and-egg", and what two outputs does it produce?',
+    options: ['It needs two robots; outputs speed and torque', 'You need a map to localize and a pose to map; it produces a map AND a pose estimate', 'It only builds a map'],
+    answer: 1, explain: 'SLAM solves localization and mapping simultaneously.' },
+  { q: 'What does loop closure correct?',
+    options: ['QoS mismatches', 'Accumulated drift, by recognizing a revisited place', 'The robot mass'],
+    answer: 1, explain: 'Recognizing a place again snaps the map consistent.' },
+  { q: 'Why fuse odometry and IMU with an EKF? What does the EKF publish?',
+    options: ['Odometry alone is perfect; EKF publishes /map', 'Each drifts differently; the EKF fuses them and publishes odom->base_footprint + /odometry/filtered', 'IMU alone is perfect; EKF publishes /scan'],
+    answer: 1, explain: 'The EKF gives a smooth, locally accurate pose.' },
+  { q: 'Who publishes map->odom, and what breaks if two nodes do?',
+    options: ['Isaac; nothing breaks', 'SLAM or AMCL (never both); two publishers cause contradictory TF and teleporting', 'The EKF; it speeds up'],
+    answer: 1, explain: 'One publisher per TF edge is the rule.' },
+  { q: 'What does the IMU yaw anchor in ekf.yaml fix, and when disable it?',
+    options: ['It fixes nothing', 'It stops ~15deg heading drift; disable it with a raw MPU6050 (no absolute yaw)', 'It fixes the lidar count'],
+    answer: 1, explain: 'Absolute-yaw fusion anchors heading; only valid with an absolute-orientation IMU.' }
+]);
+</script>
+</body>
+</html>

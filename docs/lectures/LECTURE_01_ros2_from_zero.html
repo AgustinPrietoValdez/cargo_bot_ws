@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 01 - ROS2 from zero: the graph, nodes and their attributes</title>
+<link rel="stylesheet" href="lectures.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="lec">
+  <div class="kicker">Lecture 01 &middot; Phase 0 &middot; ROS2 fundamentals</div>
+  <h1>ROS2 from zero: the graph, nodes and their attributes</h1>
+</header>
+
+<p class="goal">
+  <b>Learning goal.</b> Start from absolutely nothing and build the core mental model of ROS2:
+  what ROS2 <em>is</em>, why a robot program is split into many small programs, what a
+  <b>node</b> is and <b>every attribute it has</b>, and the ways nodes talk (topics, services,
+  actions, parameters). First the general concept, then how cargo_bot uses it.
+  <br><br>
+  <b>How to read this.</b> <span style="color:#0e639c;font-weight:700">Blue</span> = the general
+  concept (any ROS2 project). <span style="color:#1f8a4c;font-weight:700">Green</span> = how it
+  shows up in <em>our</em> robot. <span style="color:#6b3fa0;font-weight:700">Purple</span> = a
+  deeper dive. <span style="color:#b26a00;font-weight:700">Amber</span> = traps. There is a
+  comprehension check at the end.
+</p>
+
+<div class="toc">
+  <strong>In this lecture</strong>
+  1. What ROS2 is (and is not) &nbsp;&bull;&nbsp; 2. The big idea: the compute graph &nbsp;&bull;&nbsp;
+  3. What a node is &nbsp;&bull;&nbsp; 4. A node's attributes, one by one &nbsp;&bull;&nbsp;
+  5. Topics &amp; messages &nbsp;&bull;&nbsp; 6. Services &nbsp;&bull;&nbsp; 7. Actions &nbsp;&bull;&nbsp;
+  8. Parameters &nbsp;&bull;&nbsp; 9. Seeing the graph (CLI) &nbsp;&bull;&nbsp;
+  10. The cargo_bot graph (who talks to whom) &nbsp;&bull;&nbsp; 11. Check &nbsp;&bull;&nbsp; 12. Sources
+</div>
+
+<h2>1. What ROS2 is (and is not)</h2>
+
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><b>ROS2 is not an operating system</b>, despite the name (Robot Operating System). It runs
+  <em>on top of</em> your OS (Linux/Windows). It is a <b>framework + middleware + toolset</b> for
+  writing robot software:</p>
+  <ul>
+    <li><b>Middleware</b> &mdash; a standard way for many programs to talk over the network (the
+      "plumbing"; deep dive in Lecture 02).</li>
+    <li><b>Client libraries</b> &mdash; <code>rclpy</code> (Python) / <code>rclcpp</code> (C++) so
+      you write nodes without reinventing communication.</li>
+    <li><b>Conventions + packages</b> &mdash; agreed message formats, coordinate-frame rules
+      (REP-105), and thousands of ready-made packages (SLAM, navigation, drivers).</li>
+    <li><b>Tools</b> &mdash; CLI (<code>ros2 ...</code>), visualization (RViz), recording (rosbag),
+      build system (<code>colcon</code>).</li>
+  </ul>
+  <p class="analogy">Analogy: ROS2 is to robotics what a web framework is to websites &mdash; it
+  doesn't replace your computer, it gives you the structure and parts so you build the robot, not
+  the plumbing.</p>
+</div>
+
+<p>Why does it exist? Every robot needs the same hard things: read sensors, pass data between
+processes, transform coordinate frames, log, run controllers. Without a framework you rewrite all
+of that per robot. ROS2 standardizes it so the community shares parts. We are on
+<b>ROS2 Humble</b> (an LTS release).</p>
+
+<h2>2. The big idea: a robot is many small programs (the compute graph)</h2>
+
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>A ROS2 robot program is <b>not one big program</b>. It is <b>many small programs running at
+  the same time</b>, each doing one job, talking to each other. Each small program is a
+  <b>node</b>. The set of running nodes plus the connections between them is the
+  <b>compute graph</b>.</p>
+  <p>Why split it? <b>Modularity and robustness.</b> One node reads the lidar, another builds the
+  map, another plans paths. You can restart, replace or debug one without touching the others. If
+  the planner crashes, the lidar driver keeps running. You can even move a node to another machine
+  and nothing else changes.</p>
+</div>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 150" role="img" aria-label="A simple ROS2 pipeline of four nodes">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/>
+    </marker>
+  </defs>
+  <g>
+    <rect class="n-ext" x="10"  y="55" width="120" height="44" rx="8"/>
+    <text class="n-label" x="70"  y="82" text-anchor="middle">lidar driver</text>
+    <rect class="n-node" x="200" y="55" width="120" height="44" rx="8"/>
+    <text class="n-label" x="260" y="82" text-anchor="middle">SLAM</text>
+    <rect class="n-node" x="390" y="55" width="120" height="44" rx="8"/>
+    <text class="n-label" x="450" y="82" text-anchor="middle">navigation</text>
+    <rect class="n-ext"  x="580" y="55" width="120" height="44" rx="8"/>
+    <text class="n-label" x="640" y="82" text-anchor="middle">motor driver</text>
+    <line class="e-line" x1="130" y1="77" x2="200" y2="77"/>
+    <text class="e-label" x="165" y="70" text-anchor="middle">/scan</text>
+    <line class="e-line" x1="320" y1="77" x2="390" y2="77"/>
+    <text class="e-label" x="355" y="70" text-anchor="middle">/map</text>
+    <line class="e-line" x1="510" y1="77" x2="580" y2="77"/>
+    <text class="e-label" x="545" y="70" text-anchor="middle">/cmd_vel</text>
+  </g>
+</svg>
+<figcaption>The compute graph: boxes are nodes, arrows are topics (named data streams).</figcaption>
+</figure>
+
+<h2>3. What a node is</h2>
+
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>A <b>node</b> is a single unit of computation &mdash; in practice usually one running process
+  &mdash; responsible for <b>one focused job</b> ("publish laser scans", "estimate the pose"). A
+  node has a <b>name</b>, lives in the graph, <b>communicates</b> with others over named channels
+  (it does <em>not</em> call their functions directly), and is kept alive by an <b>executor</b>
+  that "spins" it &mdash; loops forever processing incoming messages and timers.</p>
+  <p class="analogy">Analogy: a node is one employee with one job. They don't walk into each
+  other's offices; they leave mail in labeled mailboxes (topics) or file formal requests
+  (services). "Spinning" is the employee sitting at their desk, checking the inbox and acting.</p>
+</div>
+
+<pre><code>import rclpy
+from rclpy.node import Node
+
+class MyNode(Node):
+    def __init__(self):
+        super().__init__('my_node')          # &lt;-- the node's NAME
+        self.get_logger().info('hello')
+
+rclpy.init()
+rclpy.spin(MyNode())                          # &lt;-- the executor keeps it alive (the "spin")</code></pre>
+
+<div class="box deep">
+  <span class="tag">Deeper &mdash; the executor &amp; callbacks</span>
+  <p>A node is event-driven: you register <b>callbacks</b> (a function to run when a message
+  arrives, or a timer fires). The <b>executor</b> is the loop that watches all of them and calls
+  the right callback. Two kinds matter later:</p>
+  <ul>
+    <li><b>SingleThreadedExecutor</b> (default) &mdash; one callback at a time, in order. Simple,
+      but a slow callback blocks the rest.</li>
+    <li><b>MultiThreadedExecutor</b> + <b>callback groups</b> &mdash; lets callbacks run
+      concurrently. A <em>reentrant</em> callback group allows a node to, say, handle a service
+      request while a timer keeps publishing. Several nodes in cargo_bot's ecosystem use this
+      pattern so a long operation doesn't freeze their heartbeat.</li>
+  </ul>
+  <p>Takeaway: "the node is running" really means "its executor is spinning, dispatching
+  callbacks". If a node seems dead, its spin is blocked or it never reached
+  <code>spin()</code>.</p>
+</div>
+
+<h2>4. A node's attributes, one by one</h2>
+
+<p>This is the heart of "what is a node". A node is defined by these attributes:</p>
+
+<table>
+  <tr><th>Attribute</th><th>What it is</th><th>Everyday analogy</th></tr>
+  <tr><td><b>Name</b></td><td>Unique identifier in the graph, e.g. <code>/amcl</code>.</td>
+    <td>The name on the office door.</td></tr>
+  <tr><td><b>Namespace</b></td><td>Optional prefix grouping/isolating a node and its topics, e.g.
+    <code>/robot1/amcl</code>. Run two robots without clashes.</td><td>The department the office is in.</td></tr>
+  <tr><td><b>Publishers</b></td><td>Outgoing channels it writes to (topic + message type). "I
+    produce this data."</td><td>Outboxes it drops mail into.</td></tr>
+  <tr><td><b>Subscriptions</b></td><td>Incoming channels it reads, each with a <em>callback</em>
+    run per message. "I consume this data."</td><td>Inboxes it watches.</td></tr>
+  <tr><td><b>Service servers / clients</b></td><td>Request&ndash;response endpoints (&sect;6): offer
+    a service, or call someone else's.</td><td>A help desk you staff, or one you phone.</td></tr>
+  <tr><td><b>Action servers / clients</b></td><td>Long-running goals with feedback (&sect;7).</td>
+    <td>Assigning a multi-step project with progress reports.</td></tr>
+  <tr><td><b>Parameters</b></td><td>Named config values read at startup/runtime, e.g.
+    <code>use_sim_time</code> (&sect;8).</td><td>The settings on the desk.</td></tr>
+  <tr><td><b>Timers</b></td><td>Callbacks on a fixed rate ("publish at 20 Hz").</td>
+    <td>An alarm: "do this every X seconds".</td></tr>
+  <tr><td><b>Logger / clock</b></td><td>Every node can log and read time (real or simulated &mdash;
+    what <code>use_sim_time</code> switches).</td><td>A notebook and a wall clock.</td></tr>
+</table>
+
+<p>Crucially, <b>nodes never call each other's functions</b>. Node A does not "call" node B; A
+publishes to a topic and B happens to subscribe. They are <em>decoupled</em> &mdash; neither knows
+who is on the other side. That decoupling is what makes the graph swappable and robust.</p>
+
+<div class="box deep">
+  <span class="tag">Deeper &mdash; lifecycle (managed) nodes</span>
+  <p>Some nodes are <b>managed lifecycle nodes</b>: they have explicit states
+  (<code>unconfigured &rarr; inactive &rarr; active</code>) and only run when something
+  "activates" them. This lets a system bring components up in a controlled order. All of Nav2's
+  servers are lifecycle nodes brought up by a <code>lifecycle_manager</code> &mdash; that's why in
+  Phase 4 you checked <code>ros2 lifecycle get /amcl</code> expecting <code>active</code>. We
+  return to this in Lecture 06.</p>
+</div>
+
+<h2>5. Topics &amp; messages (the most common way nodes talk)</h2>
+
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>A <b>topic</b> is a <b>named bus</b> for a continuous stream of data, e.g. <code>/scan</code>.
+  A node <b>publishes</b> messages to it; any node that <b>subscribes</b> receives them. It is
+  <b>asynchronous</b> (fire and forget), <b>many-to-many</b> (multiple pubs/subs share a topic),
+  and <b>typed</b> (one <b>message type</b> per topic).</p>
+  <p class="analogy">Analogy: a radio station. It broadcasts on a frequency (the topic); anyone
+  tuned in hears it; the broadcaster doesn't know who's listening.</p>
+</div>
+
+<figure class="diagram">
+<svg viewBox="0 0 720 120" role="img" aria-label="One publisher, two subscribers on a topic">
+  <defs>
+    <marker id="arrow2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/>
+    </marker>
+  </defs>
+  <rect class="n-node" x="20" y="40" width="150" height="44" rx="8"/>
+  <text class="n-label" x="95" y="62" text-anchor="middle">lidar driver</text>
+  <text class="n-sub"   x="95" y="76" text-anchor="middle">publisher</text>
+  <rect x="300" y="46" width="120" height="32" rx="16" fill="#fff" stroke="#0a7d8c" stroke-width="1.5"/>
+  <text class="e-label" x="360" y="66" text-anchor="middle">/scan</text>
+  <rect class="n-node" x="560" y="10" width="140" height="40" rx="8"/>
+  <text class="n-label" x="630" y="35" text-anchor="middle">SLAM</text>
+  <rect class="n-node" x="560" y="72" width="140" height="40" rx="8"/>
+  <text class="n-label" x="630" y="97" text-anchor="middle">obstacle layer</text>
+  <line x1="170" y1="62" x2="300" y2="62" stroke="#0a7d8c" stroke-width="1.6" marker-end="url(#arrow2)"/>
+  <line x1="420" y1="58" x2="560" y2="30" stroke="#0a7d8c" stroke-width="1.6" marker-end="url(#arrow2)"/>
+  <line x1="420" y1="66" x2="560" y2="92" stroke="#0a7d8c" stroke-width="1.6" marker-end="url(#arrow2)"/>
+</svg>
+<figcaption>One publisher, many subscribers &mdash; the publisher doesn't know who listens.</figcaption>
+</figure>
+
+<div class="box deep">
+  <span class="tag">Deeper &mdash; interfaces (.msg / .srv / .action)</span>
+  <p>The "type" of a topic is a <b>message</b> defined in a <code>.msg</code> file: a typed struct,
+  e.g. <code>sensor_msgs/msg/LaserScan</code> has fields <code>angle_min</code>,
+  <code>ranges[]</code>, etc. Services use <code>.srv</code> (request + response) and actions use
+  <code>.action</code> (goal + result + feedback). Collectively these are <b>interfaces</b>.
+  Inspect any of them with <code>ros2 interface show sensor_msgs/msg/LaserScan</code>. A publisher
+  and subscriber must agree on the exact type or they won't connect.</p>
+</div>
+
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>Isaac publishes <code>/scan</code> (LaserScan), <code>/odom</code> (Odometry),
+  <code>/imu/data</code>, <code>/clock</code>. <code>scan_angle_fixer</code> subscribes
+  <code>/scan</code> and publishes <code>/scan_fixed</code>. Topics are ~90% of how our nodes
+  talk. (Full graph in &sect;10.)</p>
+</div>
+
+<h2>6. Services (request &rarr; response)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>A <b>service</b> is a <b>one-off request that expects a reply</b>, synchronously: a client
+  sends a request, the server acts and replies, done. For short queries/commands ("clear the
+  costmap", "is this path valid?"), <em>not</em> for streams.</p>
+  <p class="analogy">Analogy: a phone call with a yes/no answer, versus a topic's radio broadcast.</p>
+</div>
+
+<h2>7. Actions (long-running goals with feedback)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>An <b>action</b> is for a <b>goal that takes time</b> where you want <b>feedback</b> and the
+  ability to <b>cancel</b>: send a goal, get periodic feedback, get a final result. Built on top
+  of topics + services.</p>
+  <p class="analogy">Analogy: food delivery &mdash; place the order (goal), get "on the way"
+  updates (feedback), can cancel, finally "delivered" (result).</p>
+</div>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>"Navigate to this goal pose" is an <b>action</b> (<code>NavigateToPose</code>): seconds long,
+  streams distance-remaining feedback, cancellable. Clicking the goal in RViz made you a client of
+  that action server inside <code>bt_navigator</code>.</p>
+</div>
+
+<h2>8. Parameters (a node's configuration knobs)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><b>Parameters</b> are named values a node reads to configure itself, usually from a YAML file
+  at launch. They change behavior <em>without editing code</em>.</p>
+</div>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>Every node takes <code>use_sim_time: true</code> &mdash; use Isaac's simulated
+  <code>/clock</code>, not the wall clock. The whole <code>nav2_params.yaml</code> is parameters:
+  AMCL's <code>scan_topic</code>, the costmap's <code>inflation_radius</code>, DWB's
+  <code>max_vel_x</code>. Tuning (Lecture 06) is mostly editing parameters.</p>
+</div>
+
+<h2>9. Seeing the graph with the CLI</h2>
+<p>You can inspect the live graph &mdash; these are your everyday debugging commands:</p>
+<pre><code>ros2 node list                 # every running node
+ros2 node info /amcl           # one node's pubs, subs, services, params
+ros2 topic list                # every topic
+ros2 topic info /scan_fixed -v # a topic's type + who pubs/subs (and their QoS)
+ros2 topic echo /scan_fixed    # print messages as they arrive
+ros2 topic hz /clock           # measure publish rate
+ros2 interface show sensor_msgs/msg/LaserScan   # see a message's fields</code></pre>
+<div class="box gotcha">
+  <span class="tag">Trap</span>
+  <p>If <code>ros2 node list</code> / <code>topic list</code> is empty or incomplete, the nodes are
+  running but <b>not discovering each other</b> &mdash; a middleware problem (wrong
+  <code>ROS_DOMAIN_ID</code>, discovery server down, or a QoS mismatch). That's exactly
+  <b>Lecture 02</b>.</p>
+</div>
+
+<h2>10. The cargo_bot graph: who talks to whom</h2>
+
+<p>Here is the real navigation graph of our robot. Solid teal arrows are <b>topics</b> (data
+streams); dashed purple arrows are <b>TF</b> (coordinate transforms &mdash; Lecture 04). Read it
+left to right: Isaac produces sensor data, it flows through localization and planning, and a
+velocity command flows back to Isaac to drive the wheels.</p>
+
+<figure class="diagram">
+<svg viewBox="0 0 860 450" role="img" aria-label="cargo_bot navigation compute graph">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/></marker>
+    <marker id="arrowtf" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b3fa0"/></marker>
+  </defs>
+
+  <!-- nodes -->
+  <rect class="n-ext"  x="15"  y="192" width="140" height="56" rx="8"/>
+  <text class="n-label" x="85" y="216" text-anchor="middle">Isaac Sim</text>
+  <text class="n-sub"   x="85" y="232" text-anchor="middle">sim + sensors</text>
+
+  <rect class="n-node" x="210" y="22"  width="160" height="46" rx="8"/>
+  <text class="n-label" x="290" y="45" text-anchor="middle">map_server</text>
+  <text class="n-sub"   x="290" y="59" text-anchor="middle">loads cuarto_v1</text>
+
+  <rect class="n-node" x="210" y="128" width="160" height="46" rx="8"/>
+  <text class="n-label" x="290" y="156" text-anchor="middle">scan_angle_fixer</text>
+
+  <rect class="n-node" x="210" y="322" width="160" height="46" rx="8"/>
+  <text class="n-label" x="290" y="350" text-anchor="middle">ekf_filter_node</text>
+
+  <rect class="n-node" x="430" y="78"  width="140" height="46" rx="8"/>
+  <text class="n-label" x="500" y="106" text-anchor="middle">amcl</text>
+
+  <rect class="n-node" x="430" y="188" width="190" height="60" rx="8"/>
+  <text class="n-label" x="525" y="212" text-anchor="middle">Nav2 servers</text>
+  <text class="n-sub"   x="525" y="230" text-anchor="middle">planner / controller / bt</text>
+
+  <rect class="n-node" x="690" y="194" width="140" height="46" rx="8"/>
+  <text class="n-label" x="760" y="222" text-anchor="middle">twist_mux</text>
+
+  <!-- topic edges -->
+  <line class="e-line" x1="155" y1="210" x2="210" y2="156"/>
+  <text class="e-label" x="158" y="178">/scan</text>
+  <line class="e-line" x1="155" y1="232" x2="210" y2="345"/>
+  <text class="e-label" x="150" y="300">/odom</text>
+
+  <line class="e-line" x1="370" y1="146" x2="430" y2="106"/>
+  <text class="e-label" x="360" y="128">/scan_fixed</text>
+  <line class="e-line" x1="370" y1="156" x2="430" y2="210"/>
+  <text class="e-label" x="360" y="186">/scan_fixed</text>
+
+  <line class="e-line" x1="370" y1="50" x2="430" y2="92"/>
+  <text class="e-label" x="376" y="44">/map</text>
+  <line class="e-line" x1="345" y1="68" x2="432" y2="200"/>
+  <text class="e-label" x="392" y="150">/map</text>
+
+  <line class="e-line" x1="620" y1="218" x2="690" y2="217"/>
+  <text class="e-label" x="612" y="208">cmd_vel_nav</text>
+
+  <!-- cmd_vel back to Isaac -->
+  <polyline class="e-line" points="760,240 760,425 85,425 85,248"/>
+  <text class="e-label" x="410" y="418" text-anchor="middle">/cmd_vel</text>
+
+  <!-- TF edges (dashed) -->
+  <line class="e-tf" x1="570" y1="100" x2="660" y2="100"/>
+  <text class="e-tflabel" x="572" y="92">TF map&rarr;odom</text>
+  <line class="e-tf" x1="370" y1="338" x2="470" y2="338"/>
+  <text class="e-tflabel" x="372" y="330">TF odom&rarr;base_footprint</text>
+</svg>
+<figcaption>cargo_bot navigation graph. Teal = topic, dashed purple = TF. Isaac is both the
+source (sensors) and the sink (drives wheels from <code>/cmd_vel</code>).</figcaption>
+</figure>
+
+<div class="box project">
+  <span class="tag">In cargo_bot &mdash; reading the graph</span>
+  <ul>
+    <li><b>Isaac</b> publishes raw sensors (<code>/scan</code>, <code>/odom</code>) and subscribes
+      <code>/cmd_vel</code> to move.</li>
+    <li><b>scan_angle_fixer</b> repairs the scan &rarr; <code>/scan_fixed</code> (consumed by amcl
+      <em>and</em> the Nav2 costmaps).</li>
+    <li><b>ekf_filter_node</b> fuses <code>/odom</code> + IMU and publishes the TF
+      <code>odom&rarr;base_footprint</code>.</li>
+    <li><b>map_server</b> serves the saved map on <code>/map</code>; <b>amcl</b> localizes and
+      publishes the TF <code>map&rarr;odom</code>.</li>
+    <li><b>Nav2 servers</b> plan + follow the path, output <code>cmd_vel_nav</code> &rarr;
+      <b>twist_mux</b> &rarr; <code>/cmd_vel</code> &rarr; back to Isaac. The loop is closed.</li>
+  </ul>
+  <p>"Launching the robot" = starting this graph (via launch files), each node reading its
+  parameters and wiring these exact topics/TF.</p>
+</div>
+
+<h2>11. Quiz (self-grading)</h2>
+<div class="quiz" id="quiz"></div>
+
+<h2>12. Go deeper (official sources)</h2>
+<ul class="src">
+  <li>Nodes: <a href="https://docs.ros.org/en/humble/Concepts/Basic/About-Nodes.html">docs.ros.org/.../About-Nodes</a></li>
+  <li>Topics: <a href="https://docs.ros.org/en/humble/Concepts/Basic/About-Topics.html">About-Topics</a> &middot;
+      Services: <a href="https://docs.ros.org/en/humble/Concepts/Basic/About-Services.html">About-Services</a> &middot;
+      Actions: <a href="https://docs.ros.org/en/humble/Concepts/Basic/About-Actions.html">About-Actions</a></li>
+  <li>Parameters: <a href="https://docs.ros.org/en/humble/Concepts/Basic/About-Parameters.html">About-Parameters</a> &middot;
+      Interfaces: <a href="https://docs.ros.org/en/humble/Concepts/Basic/About-Interfaces.html">About-Interfaces</a></li>
+  <li>Executors: <a href="https://docs.ros.org/en/humble/Concepts/Intermediate/About-Executors.html">About-Executors</a></li>
+  <li>Beginner CLI tutorials: <a href="https://docs.ros.org/en/humble/Tutorials/Beginner-CLI-Tools.html">docs.ros.org/.../Beginner-CLI-Tools</a></li>
+</ul>
+
+<div class="next">
+  <b>Next lecture &rarr;</b> <code>LECTURE_02_dds_discovery.html</code> &mdash; now that you know
+  nodes publish/subscribe, we go under the hood: <em>how</em> do nodes actually find each other
+  over the network? (DDS, Discovery Server, DOMAIN_ID, QoS &mdash; and why a message can silently
+  fail to arrive.)
+</div>
+
+</div>
+<script src="lectures.js"></script>
+<script>
+renderQuiz('quiz', [
+  { q: 'Is ROS2 an operating system?',
+    options: ['Yes, it replaces Linux/Windows', 'No &mdash; it is a framework + middleware that runs on top of an OS', 'It is a programming language'],
+    answer: 1,
+    explain: 'ROS2 runs on top of your OS; it provides middleware, client libraries, conventions and tools.' },
+  { q: 'Why is a robot program split into many nodes instead of one big program?',
+    options: ['To run slower and save power', 'For modularity/robustness: restart, replace or debug one node without touching the others', 'Because ROS2 allows only one topic per program'],
+    answer: 1,
+    explain: 'Independent nodes can crash/restart/move to another machine without bringing down the rest.' },
+  { q: 'Node A needs data that node B produces. How do they connect?',
+    options: ['A calls a function inside B', 'A publishes/subscribes on a named topic; neither node knows the other &mdash; they are decoupled', 'Through a shared global variable'],
+    answer: 1,
+    explain: 'Nodes never call each other directly. They communicate over named, typed channels (topics/services/actions).' },
+  { q: 'A topic carries...',
+    options: ['any data, untyped', 'exactly one message type that the publisher and subscriber must agree on', 'only text strings'],
+    answer: 1,
+    explain: 'Every topic has one message type (a .msg interface). Mismatched types do not connect.' },
+  { q: 'Which is best for "navigate to this pose" &mdash; long-running, with feedback and cancel?',
+    options: ['A topic', 'A service', 'An action (NavigateToPose)'],
+    answer: 2,
+    explain: 'Actions are for long goals with periodic feedback and cancellation. Services are short request/response; topics are streams.' },
+  { q: 'In the cargo_bot graph (&sect;10), which node publishes /scan_fixed, and who consumes it?',
+    options: ['Isaac publishes it; only amcl consumes it', 'scan_angle_fixer publishes it; amcl AND the Nav2 costmaps consume it', 'amcl publishes it; Isaac consumes it'],
+    answer: 1,
+    explain: 'scan_angle_fixer repairs /scan into /scan_fixed, which both AMCL and the costmaps subscribe to.' },
+  { q: 'What does the parameter use_sim_time = true do?',
+    options: ['Speeds up the simulation', 'Makes the node use the simulated /clock from Isaac instead of the wall clock', 'Disables logging'],
+    answer: 1,
+    explain: 'It switches the node clock to /clock so timestamps line up with the sim; every node in the stack sets it.' }
+]);
+</script>
+</body>
+</html>
