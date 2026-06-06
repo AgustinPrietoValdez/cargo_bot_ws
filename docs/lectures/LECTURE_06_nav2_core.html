@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 06 - Nav2 core: how the robot navigates</title>
+<link rel="stylesheet" href="lectures.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="lec">
+  <div class="kicker">Lecture 06 &middot; Phase 4a &middot; Navigation</div>
+  <h1>Nav2 core: how the robot navigates</h1>
+</header>
+
+<p class="goal">
+  <b>Learning goal.</b> Understand Nav2 as cooperating <b>lifecycle servers</b> orchestrated by a
+  <b>behavior tree</b>: AMCL (localization), costmaps (world model), NavFn (global planner), DWB
+  (local controller), and twist_mux (command arbitration). By the end you can explain what each
+  node does when you click a goal.
+</p>
+
+<div class="toc">
+  <strong>In this lecture</strong>
+  1. Goal click to motion &nbsp;&bull;&nbsp; 2. AMCL &nbsp;&bull;&nbsp; 3. Costmaps &nbsp;&bull;&nbsp;
+  4. Planner vs controller &nbsp;&bull;&nbsp; 5. Behaviors, BT, lifecycle &nbsp;&bull;&nbsp; 6. twist_mux &nbsp;&bull;&nbsp;
+  7. Quiz &nbsp;&bull;&nbsp; 8. Sources
+</div>
+
+<h2>1. The big picture: from a goal click to wheel motion</h2>
+<figure class="diagram">
+<svg viewBox="0 0 760 230" role="img" aria-label="Nav2 dataflow">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/></marker></defs>
+  <rect class="n-ext"  x="20"  y="95" width="110" height="44" rx="8"/><text class="n-label" x="75" y="122" text-anchor="middle">RViz goal</text>
+  <rect class="n-node" x="175" y="95" width="130" height="44" rx="8"/><text class="n-label" x="240" y="118" text-anchor="middle">bt_navigator</text><text class="n-sub" x="240" y="132" text-anchor="middle">behavior tree</text>
+  <rect class="n-node" x="350" y="20" width="140" height="44" rx="8"/><text class="n-label" x="420" y="43" text-anchor="middle">planner_server</text><text class="n-sub" x="420" y="57" text-anchor="middle">NavFn (global)</text>
+  <rect class="n-node" x="350" y="160" width="140" height="44" rx="8"/><text class="n-label" x="420" y="183" text-anchor="middle">controller_server</text><text class="n-sub" x="420" y="197" text-anchor="middle">DWB (local)</text>
+  <rect class="n-node" x="540" y="95" width="100" height="44" rx="8"/><text class="n-label" x="590" y="122" text-anchor="middle">twist_mux</text>
+  <rect class="n-ext"  x="680" y="95" width="70"  height="44" rx="8"/><text class="n-label" x="715" y="122" text-anchor="middle">Isaac</text>
+  <line class="e-line" x1="130" y1="117" x2="175" y2="117"/>
+  <line class="e-line" x1="305" y1="110" x2="350" y2="55"/>
+  <line class="e-line" x1="305" y1="124" x2="350" y2="178"/>
+  <line class="e-line" x1="490" y1="182" x2="540" y2="125"/>
+  <text class="e-label" x="500" y="150">cmd_vel_nav</text>
+  <line class="e-line" x1="640" y1="117" x2="680" y2="117"/>
+  <text class="e-label" x="660" y="110" text-anchor="middle">/cmd_vel</text>
+</svg>
+<figcaption>Click a goal &rarr; bt_navigator orchestrates planner + controller &rarr; cmd_vel_nav
+&rarr; twist_mux &rarr; /cmd_vel &rarr; Isaac. AMCL keeps map&rarr;odom correct throughout.</figcaption>
+</figure>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Nav2 is <b>not one program</b> &mdash; it is several <b>lifecycle nodes</b> (servers), each
+  doing one job, brought up in order by <b>lifecycle managers</b>. Understanding the division of
+  labor is the key.</p>
+</div>
+
+<h2>2. AMCL: localizing against the saved map</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><b>AMCL (Adaptive Monte Carlo Localization)</b> is a <b>particle filter</b>: scatter many
+  pose hypotheses ("particles"), weight each by how well the lidar matches the map, resample
+  toward the good ones, converge. The cloud tightening on the robot = high confidence (the "little
+  arrows" in RViz).</p>
+</div>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>AMCL publishes <code>map &rarr; odom</code> (same edge SLAM used &mdash; why they cannot
+  co-run). It needs an <b>initial pose</b> (cannot solve the global "kidnapped robot" from
+  scratch): <code>set_initial_pose: true</code> with <code>(0,0,0)</code> (the confirmed spawn).
+  Uses <code>/scan_fixed</code>, <code>base_footprint</code>, DifferentialMotionModel.</p>
+</div>
+
+<h2>3. Costmaps: the robot's model of the world</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>A <b>costmap</b> is a grid where each cell holds a <em>cost</em> (how bad to be there). Nav2
+  runs two: <b>global_costmap</b> (whole map, <code>frame: map</code>, for the planner) and
+  <b>local_costmap</b> (small rolling window, <code>frame: odom</code>, for real-time avoidance).
+  Built from <b>layers</b>: <b>static</b> (the saved map), <b>obstacle</b> (live from
+  <code>/scan_fixed</code>), <b>inflation</b> (a cost halo around obstacles for clearance).</p>
+</div>
+
+<h2>4. Planner (NavFn) vs Controller (DWB): global vs local</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <ul>
+    <li><b>planner_server / NavFn</b> = the <b>global</b> planner. Given start + goal + global
+      costmap, compute the full route (Dijkstra/A*). It plans, it does not drive.</li>
+    <li><b>controller_server / DWB</b> = the <b>local</b> controller. 20&times;/s it samples short
+      candidate trajectories, scores each with <b>critics</b> (stay on path, reach goal, avoid
+      obstacles, do not oscillate), and emits the best velocity. DWB is what dodges a chair that
+      appears.</li>
+  </ul>
+  <p>DWB outputs to <code>cmd_vel_nav</code> (remapped), not directly to <code>/cmd_vel</code> &mdash;
+  so it goes through the mux.</p>
+</div>
+
+<h2>5. Behaviors, the BT, and lifecycle managers</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <ul>
+    <li><b>behavior_server</b> &mdash; recovery behaviors (spin, backup, wait) when stuck. It also
+      publishes velocity (the harmless second <code>/cmd_vel</code> publisher you saw).</li>
+    <li><b>bt_navigator</b> &mdash; runs a <b>behavior tree</b> (XML) orchestrating "compute path
+      &rarr; follow &rarr; if stuck, recover &rarr; retry".</li>
+    <li><b>lifecycle managers</b> &mdash; Nav2 nodes are managed (unconfigured &rarr; inactive
+      &rarr; active); a manager brings a group up in order, <code>autostart: true</code> activates
+      them. cargo_bot has two: localization (<code>map_server</code>, <code>amcl</code>) and
+      navigation (controller, planner, behavior, bt, waypoint). Stuck in <code>inactive</code> =
+      manager order or a bad plugin.</li>
+  </ul>
+</div>
+
+<h2>6. twist_mux: arbitrating who drives</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Multiple sources may command the robot (Nav2 now; joystick + e-stop later). <b>twist_mux</b>
+  forwards the highest-<b>priority</b> active input to <code>/cmd_vel</code>.</p>
+</div>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>One input today: <code>navigation</code> (<code>cmd_vel_nav</code>, priority 10). Set up early
+  so adding joystick (100) / e-stop (255) in Phase 4b needs no refactor. The controller's remap
+  (<code>cmd_vel &rarr; cmd_vel_nav</code>) feeds the mux; the mux's
+  <code>cmd_vel_out &rarr; /cmd_vel</code> feeds Isaac.</p>
+</div>
+
+<h2>7. Quiz (self-grading)</h2>
+<div class="quiz" id="quiz"></div>
+
+<h2>8. Go deeper (official sources)</h2>
+<ul class="src">
+  <li>Nav2 docs: <a href="https://docs.nav2.org/">docs.nav2.org</a></li>
+  <li>AMCL: <a href="https://docs.nav2.org/configuration/packages/configuring-amcl.html">configuring-amcl</a> &middot;
+      Costmaps: <a href="https://docs.nav2.org/configuration/packages/configuring-costmaps.html">configuring-costmaps</a></li>
+  <li>DWB: <a href="https://docs.nav2.org/configuration/packages/configuring-dwb-controller.html">configuring-dwb-controller</a> &middot;
+      Behavior trees: <a href="https://docs.nav2.org/behavior_trees/index.html">behavior_trees</a></li>
+</ul>
+
+<div class="next"><b>Next lecture &rarr;</b> <code>LECTURE_07_nav2_tuning.html</code> &mdash; smooth,
+reliable motion: inflation, DWB critics, recovery, smoothers.</div>
+
+</div>
+<script src="lectures.js"></script>
+<script>
+renderQuiz('quiz', [
+  { q: 'Difference between the global planner (NavFn) and the local controller (DWB)?',
+    options: ['Same thing', 'NavFn computes the full route over the global costmap; DWB follows it locally and dodges live obstacles', 'NavFn drives, DWB plans'],
+    answer: 1, explain: 'Global route vs local real-time control.' },
+  { q: 'How does AMCL estimate the pose, and why an initial pose?',
+    options: ['GPS; no initial pose needed', 'A particle filter weighted by lidar-vs-map match; it needs a starting hypothesis (cannot solve global kidnapped robot)', 'It reads it from the URDF'],
+    answer: 1, explain: 'set_initial_pose seeds the particle cloud at the spawn.' },
+  { q: 'Name the three costmap layers.',
+    options: ['static, obstacle, inflation', 'visual, collision, inertial', 'map, odom, base'],
+    answer: 0, explain: 'Static (saved map), obstacle (live scan), inflation (clearance halo).' },
+  { q: 'Why two lifecycle managers, and what does autostart:true do?',
+    options: ['Redundancy; autostart logs more', 'One for localization, one for navigation; autostart brings the group to active automatically', 'No reason; autostart disables them'],
+    answer: 1, explain: 'Managers activate their node group in order on startup.' },
+  { q: 'Why does the controller publish to cmd_vel_nav instead of /cmd_vel?',
+    options: ['Bug', 'So its output goes through twist_mux (which arbitrates by priority) before reaching Isaac', 'To save bandwidth'],
+    answer: 1, explain: 'Everything should pass through the mux to /cmd_vel.' }
+]);
+</script>
+</body>
+</html>

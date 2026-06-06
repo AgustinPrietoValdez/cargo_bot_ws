@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 07 - Nav2 tuning: smooth, reliable motion</title>
+<link rel="stylesheet" href="lectures.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="lec">
+  <div class="kicker">Lecture 07 &middot; Phase 4a.2 &middot; Tuning &mdash; the next topic</div>
+  <h1>Nav2 tuning: smooth, reliable motion</h1>
+</header>
+
+<p class="goal">
+  <b>Learning goal.</b> Understand the knobs that turn "it reaches the goal but pivots/jerks" into
+  "it glides": inflation (<code>inflation_radius</code>, <code>cost_scaling_factor</code>), the
+  <b>DWB critics</b> and trajectory sampling, recovery behaviors, and the optional smoothers. By
+  the end you can read a behavior symptom and know which knob to turn. <b>Study this before
+  touching params.</b>
+</p>
+
+<div class="toc">
+  <strong>In this lecture</strong>
+  1. The tuning mindset &nbsp;&bull;&nbsp; 2. Inflation &nbsp;&bull;&nbsp; 3. DWB sampling &amp; critics &nbsp;&bull;&nbsp;
+  4. Goal tolerances &amp; progress &nbsp;&bull;&nbsp; 5. Recoveries &amp; smoothers &nbsp;&bull;&nbsp;
+  6. A workflow for cargo_bot &nbsp;&bull;&nbsp; 7. Quiz &nbsp;&bull;&nbsp; 8. Sources
+</div>
+
+<h2>1. The tuning mindset</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Default params get you "it moves". Tuning <b>matches the params to YOUR robot and space</b>: a
+  small diff-drive bot in a 5&times;4.9 m room needs different values than a warehouse robot. The
+  discipline: <b>change one knob, observe in RViz (costmap + path + trajectory), repeat.</b> Never
+  five at once.</p>
+</div>
+
+<h2>2. Inflation: the most impactful knob in a small room</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>The <b>inflation layer</b> spreads cost outward from every obstacle so the planner keeps
+  clearance. <b><code>inflation_radius</code></b> = how far the halo extends;
+  <b><code>cost_scaling_factor</code></b> = how steeply cost decays within it (exponential: higher
+  = faster drop-off).</p>
+</div>
+<figure class="diagram">
+<svg viewBox="0 0 700 240" role="img" aria-label="Inflation cost vs distance">
+  <line x1="70" y1="200" x2="660" y2="200" stroke="#5b6b7a" stroke-width="1.5"/>
+  <line x1="70" y1="200" x2="70" y2="30" stroke="#5b6b7a" stroke-width="1.5"/>
+  <text class="n-sub" x="60" y="40" text-anchor="end">cost</text>
+  <text class="n-sub" x="655" y="218" text-anchor="end">distance from obstacle</text>
+  <!-- lethal plateau then exponential decay -->
+  <path d="M70,50 L150,50 C 250,55 320,150 420,185 C 480,196 560,199 600,200"
+        fill="none" stroke="#0a7d8c" stroke-width="2.5"/>
+  <line x1="150" y1="40" x2="150" y2="205" stroke="#b26a00" stroke-dasharray="4 3"/>
+  <text class="e-tflabel" x="150" y="225" text-anchor="middle" style="fill:#b26a00">inscribed radius</text>
+  <line x1="600" y1="40" x2="600" y2="205" stroke="#6b3fa0" stroke-dasharray="4 3"/>
+  <text class="e-tflabel" x="600" y="225" text-anchor="middle" style="fill:#6b3fa0">inflation_radius</text>
+  <text class="n-sub" x="105" y="45">lethal</text>
+</svg>
+<figcaption>Cost is lethal near the obstacle, then decays exponentially out to
+<code>inflation_radius</code> (where it hits zero). <code>cost_scaling_factor</code> sets the
+curve's steepness.</figcaption>
+</figure>
+<div class="box gotcha">
+  <span class="tag">Trap &mdash; the small-room killer</span>
+  <p>Humble's default <code>inflation_radius: 0.55</code> literally <b>walls off a small room</b>:
+  halos from opposite walls overlap, leaving no zero-cost path &rarr; "No valid path" with the
+  costmap fully colored. cargo_bot uses <b>0.35</b>. Too low instead &rarr; the robot cuts corners
+  and clips walls.</p>
+</div>
+
+<h2>3. DWB: trajectory sampling and critics</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>DWB (20&times;/s) samples candidate trajectories and scores them with <b>critics</b>.</p>
+  <p><b>Sampling</b> (the search space): <code>vx_samples</code>/<code>vtheta_samples</code> (how
+  many velocities to try), <code>max_vel_x</code> (0.26 &mdash; small robot),
+  <code>max_vel_y: 0.0</code> (diff-drive cannot strafe), accel limits, and <code>sim_time</code>
+  (1.7 s &mdash; how far each candidate is rolled out; too short = short-sighted, too long =
+  sluggish).</p>
+</div>
+<div class="box deep">
+  <span class="tag">Deeper &mdash; critics (where pivoting/jerk lives)</span>
+  <p>Each critic scores a trajectory; the weighted sum picks the winner:</p>
+  <ul>
+    <li><b>PathAlign / PathDist</b> &mdash; reward following the global path. <b>Raising
+      <code>PathAlign.scale</code> reduces pivoting/wandering.</b></li>
+    <li><b>GoalAlign / GoalDist</b> &mdash; reward progressing to the goal.</li>
+    <li><b>RotateToGoal</b> &mdash; the final in-place rotation to the goal heading.</li>
+    <li><b>Oscillation</b> &mdash; penalizes flip-flopping (prevents wiggling stuck).</li>
+    <li><b>BaseObstacle</b> &mdash; penalizes trajectories near obstacles.</li>
+  </ul>
+  <p><b>Symptom &rarr; knob:</b> pivots/won't commit &rarr; raise <code>PathAlign.scale</code>;
+  wiggles in place &rarr; Oscillation + goal tolerances; jerky &rarr; sampling granularity +
+  smoothers (&sect;5).</p>
+</div>
+
+<h2>4. Goal tolerances and the progress checker</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><code>xy_goal_tolerance</code>/<code>yaw_goal_tolerance</code> (0.25) = how close counts as
+  "arrived" (too tight &rarr; a small robot oscillates forever; too loose &rarr; stops short). The
+  <b>progress_checker</b> (<code>required_movement_radius</code>,
+  <code>movement_time_allowance</code>) declares "stuck" if the robot does not move 0.5 m in 10 s
+  &rarr; triggers recovery. Tune so normal slow maneuvers do not falsely trip it.</p>
+</div>
+
+<h2>5. Recovery behaviors and smoothers (Step 2, optional)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><b>Recoveries</b> (spin / backup / wait) run when stuck &mdash; mostly tune so they do not
+  fire <em>too eagerly</em> (false stuck) and the distances suit the room.</p>
+  <p><b>Smoothers</b> (only if motion is still rough): <b>smoother_server (simple_smoother)</b>
+  smooths the <b>global path</b> (rounds NavFn's sharp corners &mdash; biggest win for
+  pivot-at-every-corner); <b>velocity_smoother</b> smooths the <b>velocity commands</b> (limits
+  jerk/accel &mdash; biggest win for abrupt start/stop).</p>
+</div>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>Project rule: <b>only add smoothers if Step 1 motion bothers you.</b> Do not pre-optimize.
+  See <code>FASE4_GUIA_NAV2.md</code> section 7.</p>
+</div>
+
+<h2>6. A tuning workflow for cargo_bot (4a.2)</h2>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <ol>
+    <li>Send goals, <b>watch RViz</b>: pivot? jerk? cut corners? refuse to plan?</li>
+    <li>"No valid path" / costmap fully colored &rarr; lower <code>inflation_radius</code> (at 0.35).</li>
+    <li>Pivots / wanders off path &rarr; raise <code>PathAlign.scale</code>, check <code>sim_time</code>.</li>
+    <li>Jerky &rarr; add <code>smoother_server</code>; abrupt start/stop &rarr; add <code>velocity_smoother</code>.</li>
+    <li>Re-test with several goals + the <b>waypoint_follower</b>.</li>
+    <li>When it glides, leave the scene ready to record the clip.</li>
+  </ol>
+</div>
+
+<h2>7. Quiz (self-grading)</h2>
+<div class="quiz" id="quiz"></div>
+
+<h2>8. Go deeper (official sources)</h2>
+<ul class="src">
+  <li>Nav2 tuning guide: <a href="https://docs.nav2.org/tuning/index.html">docs.nav2.org/tuning</a></li>
+  <li>Inflation layer: <a href="https://docs.nav2.org/configuration/packages/costmap-plugins/inflation.html">inflation</a></li>
+  <li>DWB controller + critics: <a href="https://docs.nav2.org/configuration/packages/configuring-dwb-controller.html">configuring-dwb-controller</a></li>
+  <li>Smoother server: <a href="https://docs.nav2.org/configuration/packages/configuring-smoother-server.html">smoother-server</a> &middot;
+      Velocity smoother: <a href="https://docs.nav2.org/configuration/packages/configuring-velocity-smoother.html">velocity-smoother</a></li>
+</ul>
+
+<div class="next"><b>End of the current batch.</b> Upcoming (Phase 4b+): safety layers, camera +
+AprilTag, mission DSL, HW prep, sim capstone.</div>
+
+</div>
+<script src="lectures.js"></script>
+<script>
+renderQuiz('quiz', [
+  { q: 'What do inflation_radius and cost_scaling_factor control?',
+    options: ['Robot speed and accel', 'How far the cost halo extends, and how steeply cost decays within it', 'The map resolution'],
+    answer: 1, explain: 'They shape the clearance cost around obstacles.' },
+  { q: 'Why does too-high inflation_radius cause "No valid path" in a small room?',
+    options: ['It speeds the robot', 'Halos from opposite walls overlap, leaving no zero-cost path', 'It disables the planner'],
+    answer: 1, explain: 'cargo_bot lowered it to 0.35 for this reason.' },
+  { q: 'The robot pivots and wanders off the global path. Which knob first?',
+    options: ['Raise PathAlign.scale', 'Lower max_vel_x to 0', 'Disable AMCL'],
+    answer: 0, explain: 'PathAlign rewards following the path more faithfully.' },
+  { q: 'What does sim_time control in DWB, and the trade-off of too long?',
+    options: ['Wall clock; none', 'How far each candidate trajectory is rolled out; too long = sluggish to react', 'The map size; none'],
+    answer: 1, explain: 'Too short is short-sighted; too long reacts slowly.' },
+  { q: 'Path is followed but motion is jerky at corners. Which smoother helps the path vs the commands?',
+    options: ['smoother_server smooths the path; velocity_smoother smooths the velocity commands', 'Both smooth the path', 'Neither helps'],
+    answer: 0, explain: 'smoother_server rounds the global path; velocity_smoother limits jerk/accel.' }
+]);
+</script>
+</body>
+</html>

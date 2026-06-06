@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cargo_bot - Lectures</title>
+<link rel="stylesheet" href="lectures.css">
+<style>
+  .lec-card{display:block; text-decoration:none; color:inherit; border:1px solid var(--border);
+    border-left:5px solid var(--accent); border-radius:10px; padding:14px 18px; margin:12px 0;
+    transition:background .12s, transform .08s;}
+  .lec-card:hover{background:#f0f7f8; transform:translateX(2px);}
+  .lec-card .num{display:inline-block; min-width:34px; font-weight:800; color:var(--accent);}
+  .lec-card .ttl{font-weight:700; font-size:17px;}
+  .lec-card .meta{color:var(--muted); font-size:14px; margin-top:3px; margin-left:34px;}
+  .badge{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em;
+    padding:2px 8px; border-radius:10px; margin-left:8px;}
+  .b-review{background:#eaf3fb; color:#0e639c;} .b-next{background:#eafaf0; color:#1f8a4c;}
+  .b-soon{background:#f3eefb; color:#6b3fa0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="lec">
+  <div class="kicker">cargo_bot &middot; Learning project</div>
+  <h1>Lectures</h1>
+</header>
+<p class="goal">Deep lectures for learning ROS2 by building cargo_bot. Each one: <b>concept first,
+then how we use it</b>, with diagrams and a self-grading quiz. Read top to bottom; the early ones
+review what is already built.</p>
+
+<a class="lec-card" href="LECTURE_01_ros2_from_zero.html">
+  <div><span class="num">01</span><span class="ttl">ROS2 from zero: the graph, nodes &amp; their attributes</span><span class="badge b-review">review</span></div>
+  <div class="meta">Phase 0 &middot; what ROS2 is, the compute graph, nodes, topics/services/actions, parameters</div></a>
+<a class="lec-card" href="LECTURE_02_dds_discovery.html">
+  <div><span class="num">02</span><span class="ttl">DDS, the Discovery Server &amp; QoS</span><span class="badge b-review">review</span></div>
+  <div class="meta">Phase 0 &middot; how nodes find each other; DOMAIN_ID; why messages silently fail</div></a>
+<a class="lec-card" href="LECTURE_03_urdf_xacro.html">
+  <div><span class="num">03</span><span class="ttl">URDF &amp; xacro: describing the robot</span><span class="badge b-review">review</span></div>
+  <div class="meta">Phase 1 &middot; links, joints, inertias, base_footprint, the frozen-wheels gotcha</div></a>
+<a class="lec-card" href="LECTURE_04_isaac_sensors.html">
+  <div><span class="num">04</span><span class="ttl">Isaac Sim, OmniGraph &amp; the ROS2 bridge</span><span class="badge b-review">review</span></div>
+  <div class="meta">Phase 2 &middot; USD/PhysX, wiring sensors to topics, lidar/IMU/cmd_vel chains</div></a>
+<a class="lec-card" href="LECTURE_05_slam_ekf.html">
+  <div><span class="num">05</span><span class="ttl">SLAM, the EKF &amp; the TF tree</span><span class="badge b-review">review</span></div>
+  <div class="meta">Phase 3 &middot; mapping, sensor fusion, one-publisher-per-TF-edge</div></a>
+<a class="lec-card" href="LECTURE_06_nav2_core.html">
+  <div><span class="num">06</span><span class="ttl">Nav2 core: how the robot navigates</span><span class="badge b-review">review</span></div>
+  <div class="meta">Phase 4a &middot; AMCL, costmaps, NavFn, DWB, lifecycle, behavior trees, twist_mux</div></a>
+<a class="lec-card" href="LECTURE_07_nav2_tuning.html">
+  <div><span class="num">07</span><span class="ttl">Nav2 tuning: smooth, reliable motion</span><span class="badge b-next">next</span></div>
+  <div class="meta">Phase 4a.2 &middot; inflation, DWB critics, recovery, smoothers &mdash; the next topic</div></a>
+
+<p class="goal" style="margin-top:24px"><b>Coming next (Phase 4b+):</b> safety layers,
+camera + AprilTag docking, mission DSL, hardware prep, simulation capstone (multi-floor + elevator
++ laundry pickup).</p>
+</div>
+</body>
+</html>

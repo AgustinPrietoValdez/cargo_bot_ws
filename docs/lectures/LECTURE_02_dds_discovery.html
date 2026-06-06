@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 02 - DDS, the Discovery Server and QoS</title>
+<link rel="stylesheet" href="lectures.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="lec">
+  <div class="kicker">Lecture 02 &middot; Phase 0 &middot; Middleware</div>
+  <h1>How nodes find each other: DDS, the Discovery Server and QoS</h1>
+</header>
+
+<p class="goal">
+  <b>Learning goal.</b> In Lecture 01 nodes magically "published" and "subscribed". Now we go
+  under the hood: <em>how</em> do two processes actually discover each other over the network, and
+  once they do, what decides whether a message is delivered? You will understand DDS, why
+  cargo_bot needs a <b>Discovery Server</b>, the <b>DOMAIN_ID</b>, and <b>QoS</b> &mdash; and you
+  will be able to debug "I can't see the topic".
+</p>
+
+<div class="toc">
+  <strong>In this lecture</strong>
+  1. Two separate jobs &nbsp;&bull;&nbsp; 2. There is no master &nbsp;&bull;&nbsp; 3. DDS &amp; the layers &nbsp;&bull;&nbsp;
+  4. Default discovery (multicast) &nbsp;&bull;&nbsp; 5. Why it breaks here &nbsp;&bull;&nbsp; 6. Discovery Server &nbsp;&bull;&nbsp;
+  7. DOMAIN_ID &nbsp;&bull;&nbsp; 8. QoS &nbsp;&bull;&nbsp; 9. In cargo_bot &nbsp;&bull;&nbsp; 10. Quiz &nbsp;&bull;&nbsp; 11. Sources
+</div>
+
+<h2>1. Discovery vs delivery: two separate jobs</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>The middleware does <b>two distinct things</b> we must not confuse:</p>
+  <ul>
+    <li><b>Discovery</b> &mdash; how participants <em>find</em> each other and learn who publishes
+      what (sections 4&ndash;6).</li>
+    <li><b>Delivery (QoS)</b> &mdash; once they know each other, with what <em>guarantees</em> data
+      is sent (section 8).</li>
+  </ul>
+  <p>"I can't see the topic" is almost always a <b>discovery</b> problem; "the topic exists but no
+  messages arrive" is almost always a <b>QoS</b> problem.</p>
+</div>
+
+<h2>2. There is no master</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>ROS1 had a central <code>roscore</code> where everyone registered. <b>ROS2 has none.</b>
+  Instead it uses <b>DDS</b> (Data Distribution Service), an industrial peer-to-peer standard.
+  More robust (no single process to kill) but it creates the problem of this lecture: with no
+  directory, how does a node find the others?</p>
+</div>
+
+<h2>3. DDS and the layer stack</h2>
+<p>ROS2 talks to DDS through an abstraction layer so it can use different DDS vendors:</p>
+<pre><code>Your code (rclpy / rclcpp)
+  -> rcl (C core)
+  -> rmw (ROS middleware interface)     "talk to ANY DDS"
+  -> rmw_fastrtps_cpp                    &lt;-- the plug cargo_bot uses
+  -> Fast DDS (eProsima)                 the real DDS moving bytes
+  -> UDP / shared memory / the network</code></pre>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>We pin <code>RMW_IMPLEMENTATION=rmw_fastrtps_cpp</code> so every process uses <b>Fast DDS</b>.
+  Mixing RMWs can still work (it is the DDS-RTPS standard underneath) but pinning avoids config
+  surprises.</p>
+</div>
+
+<h2>4. The default: Simple Discovery (multicast)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>By default Fast DDS uses <b>multicast</b>: on startup each participant shouts "I exist, I
+  publish X" to a multicast address; everyone listening builds the who-publishes-what map, then
+  switches to unicast for details. Works great on a normal LAN. <b>Its weakness: it needs
+  multicast UDP to flow between processes.</b></p>
+</div>
+
+<h2>5. Why the default breaks in this project</h2>
+<div class="box gotcha">
+  <span class="tag">Trap</span>
+  <p>cargo_bot runs <b>across a boundary</b>: Isaac Sim on <b>Windows</b>, the ROS2 nodes in
+  <b>WSL2</b> (virtualized Linux). The Windows&harr;WSL2 link is a NAT/virtual interface where
+  <b>multicast UDP does not propagate reliably</b>. With Simple Discovery the two sides never see
+  each other &mdash; topics never appear, <code>ros2 topic list</code> is incomplete.</p>
+</div>
+
+<h2>6. The fix: Discovery Server (unicast, client&ndash;server)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Fast DDS offers a <b>Discovery Server</b>: one process is the <b>server</b> at a fixed
+  IP:port; everyone else is a <b>client</b> that connects by <b>unicast</b> to register and learn
+  the others. It is a directory again &mdash; but only for <em>discovery</em>. The actual
+  <b>data still flows peer-to-peer</b>; the server is not a data bottleneck.</p>
+</div>
+
+<figure class="diagram">
+<svg viewBox="0 0 760 320" role="img" aria-label="Discovery server topology">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/></marker>
+    <marker id="arrowd" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6b3fa0"/></marker>
+  </defs>
+  <rect x="300" y="130" width="170" height="56" rx="8" fill="#fff3e0" stroke="#b26a00" stroke-width="2"/>
+  <text class="n-label" x="385" y="154" text-anchor="middle">Discovery Server</text>
+  <text class="n-sub"   x="385" y="170" text-anchor="middle">WSL  127.0.0.1:11811</text>
+
+  <rect class="n-node" x="40" y="30" width="150" height="44" rx="8"/>
+  <text class="n-label" x="115" y="57" text-anchor="middle">Isaac (Windows)</text>
+  <rect class="n-node" x="40" y="240" width="150" height="44" rx="8"/>
+  <text class="n-label" x="115" y="267" text-anchor="middle">amcl (WSL)</text>
+  <rect class="n-node" x="580" y="30" width="150" height="44" rx="8"/>
+  <text class="n-label" x="655" y="57" text-anchor="middle">ekf (WSL)</text>
+  <rect class="n-node" x="580" y="240" width="150" height="44" rx="8"/>
+  <text class="n-label" x="655" y="267" text-anchor="middle">controller (WSL)</text>
+
+  <!-- discovery (unicast) to server -->
+  <line class="e-line" x1="180" y1="62"  x2="305" y2="140"/>
+  <line class="e-line" x1="180" y1="255" x2="305" y2="175"/>
+  <line class="e-line" x1="590" y1="62"  x2="465" y2="140"/>
+  <line class="e-line" x1="590" y1="255" x2="465" y2="175"/>
+  <text class="e-label" x="225" y="100">discovery (unicast)</text>
+
+  <!-- data peer to peer -->
+  <line class="e-tf" x1="190" y1="52" x2="580" y2="52"/>
+  <text class="e-tflabel" x="300" y="44">data flows peer-to-peer (not via server)</text>
+</svg>
+<figcaption>Every node registers with the server (teal). But topic <em>data</em> travels directly
+between nodes (dashed purple). The server only helps them find each other.</figcaption>
+</figure>
+
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <ul>
+    <li><b>WSL = SERVER</b> on <code>127.0.0.1:11811</code> (<code>start_discovery_server.sh</code>).</li>
+    <li><b>Isaac = CLIENT</b> (address patched by <code>launch_isaac_ros.cmd</code>).</li>
+    <li>WSL nodes = clients (via <code>source_ros_wsl.sh</code>).</li>
+  </ul>
+  <p>Boot order matters: <b>server first</b>, then Isaac, then nodes. Start a client with no live
+  server and it discovers nothing.</p>
+</div>
+
+<h2>7. DOMAIN_ID: isolated rooms</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>The <code>ROS_DOMAIN_ID</code> (an integer) is a <b>logical partition</b>: participants in
+  different domains do not see each other, even on the same network (it maps to different UDP
+  ports &mdash; real isolation). It keeps two projects/robots from stepping on each other.</p>
+</div>
+<div class="box gotcha">
+  <span class="tag">Trap</span>
+  <p>cargo_bot uses <code>ROS_DOMAIN_ID=1</code> (NOT 4, which was another project). Both WSL and
+  Isaac must share it, or they never discover each other even with the server correct. First
+  suspect when "everything looks fine but I see nothing".</p>
+</div>
+
+<h2>8. QoS: does the message actually arrive?</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p><b>QoS (Quality of Service)</b> sets delivery guarantees. The rule that bites everyone: <b>if
+  publisher QoS and subscriber QoS are incompatible, they do not connect</b>, even though the
+  topic exists. Three policies you will touch:</p>
+  <ul>
+    <li><b>Reliability</b>: RELIABLE (retransmit, for commands/maps/TF) vs BEST_EFFORT (drop-ok,
+      for high-rate sensors like <code>/scan</code>, <code>/odom</code>, <code>/particle_cloud</code>).</li>
+    <li><b>Durability</b>: VOLATILE (only future samples) vs TRANSIENT_LOCAL (keep last sample for
+      late joiners &mdash; this is "latched", used by <code>/map</code>).</li>
+    <li><b>History</b>: KEEP_LAST(depth=N) vs KEEP_ALL.</li>
+  </ul>
+</div>
+
+<p><b>The reliability compatibility matrix &mdash; memorize it:</b></p>
+<table>
+  <tr><th>Publisher</th><th>Subscriber</th><th>Connects?</th></tr>
+  <tr><td>RELIABLE</td><td>RELIABLE</td><td>yes</td></tr>
+  <tr><td>RELIABLE</td><td>BEST_EFFORT</td><td>yes</td></tr>
+  <tr><td>BEST_EFFORT</td><td>BEST_EFFORT</td><td>yes</td></tr>
+  <tr><td><b>BEST_EFFORT</b></td><td><b>RELIABLE</b></td><td><b>NO</b></td></tr>
+</table>
+
+<div class="box gotcha">
+  <span class="tag">Trap &mdash; the one that bit you</span>
+  <p>In Phase 4, RViz showed <code>incompatible QoS &hellip; RELIABILITY</code> on
+  <code>/particle_cloud</code> and the AMCL cloud did not appear. Cause: AMCL publishes
+  BEST_EFFORT, RViz requested RELIABLE &rarr; bottom row of the matrix. Fix: set the RViz display
+  to <b>Best Effort</b>.</p>
+</div>
+
+<h2>9. How this maps to the boot sequence</h2>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p><code>source_ros_wsl.sh</code> exports <code>ROS_DOMAIN_ID=1</code>,
+  <code>RMW_IMPLEMENTATION=rmw_fastrtps_cpp</code> and the discovery-server variables (source it in
+  every WSL terminal). Boot: (1) discovery server, (2) Isaac + Play, (3) ROS2 nodes. Break the
+  order &rarr; "topics do not appear".</p>
+</div>
+
+<h2>10. Quiz (self-grading)</h2>
+<div class="quiz" id="quiz"></div>
+
+<h2>11. Go deeper (official sources)</h2>
+<ul class="src">
+  <li>Discovery Server (Fast DDS): <a href="https://fast-dds.docs.eprosima.com/en/latest/fastdds/discovery/discovery_server.html">fast-dds.docs.eprosima.com</a></li>
+  <li>ROS2 Discovery Server tutorial: <a href="https://docs.ros.org/en/humble/Tutorials/Advanced/Discovery-Server/Discovery-Server.html">docs.ros.org</a></li>
+  <li>About the Domain ID: <a href="https://docs.ros.org/en/humble/Concepts/Intermediate/About-Domain-ID.html">docs.ros.org</a></li>
+  <li>About QoS settings: <a href="https://docs.ros.org/en/humble/Concepts/Intermediate/About-Quality-of-Service-Settings.html">docs.ros.org</a></li>
+</ul>
+
+<div class="next"><b>Next lecture &rarr;</b> <code>LECTURE_03_urdf_xacro.html</code> &mdash; describing
+the robot's body as links + joints, authored in xacro.</div>
+
+</div>
+<script src="lectures.js"></script>
+<script>
+renderQuiz('quiz', [
+  { q: 'You run two nodes and "see no topics". Discovery problem or QoS problem?',
+    options: ['QoS problem', 'Discovery problem &mdash; they have not found each other'],
+    answer: 1, explain: '"Cannot see the topic" = discovery. "Topic exists but no messages" = QoS.' },
+  { q: 'Why does cargo_bot use a Discovery Server instead of the default?',
+    options: ['It is faster for data', 'Multicast UDP does not cross the Windows&harr;WSL2 boundary reliably; the server uses unicast', 'ROS2 Humble requires it'],
+    answer: 1, explain: 'The default relies on multicast, which the WSL2 NAT interface does not pass reliably.' },
+  { q: 'Once nodes are discovered, does topic data flow through the Discovery Server?',
+    options: ['Yes, everything goes through the server', 'No &mdash; data flows peer-to-peer; the server only helps discovery'],
+    answer: 1, explain: 'The server is a directory for discovery only; it is not a data bottleneck.' },
+  { q: 'Two nodes share a network but never see each other. First suspect?',
+    options: ['Different ROS_DOMAIN_ID', 'The CPU is too slow', 'Wrong file permissions'],
+    answer: 0, explain: 'Different DOMAIN_IDs are fully isolated. cargo_bot uses 1 everywhere.' },
+  { q: 'Publisher is BEST_EFFORT, subscriber requests RELIABLE. Do they connect?',
+    options: ['Yes', 'No &mdash; a RELIABLE subscriber will not accept a BEST_EFFORT publisher'],
+    answer: 1, explain: 'Bottom row of the matrix. This caused the /particle_cloud no-show in RViz.' },
+  { q: 'Which QoS lets a late-joining subscriber still receive the last /map?',
+    options: ['VOLATILE', 'TRANSIENT_LOCAL (latched)', 'BEST_EFFORT'],
+    answer: 1, explain: 'TRANSIENT_LOCAL keeps the last sample for subscribers that join later.' }
+]);
+</script>
+</body>
+</html>

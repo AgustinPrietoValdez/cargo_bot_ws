@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lecture 04 - Isaac Sim, OmniGraph and the ROS2 bridge</title>
+<link rel="stylesheet" href="lectures.css">
+</head>
+<body>
+<div class="wrap">
+
+<header class="lec">
+  <div class="kicker">Lecture 04 &middot; Phase 2 &middot; Simulation</div>
+  <h1>Isaac Sim, OmniGraph and the ROS2 bridge</h1>
+</header>
+
+<p class="goal">
+  <b>Learning goal.</b> Understand what Isaac Sim is (USD + PhysX), how an <b>OmniGraph</b> wires a
+  simulated sensor to a ROS2 topic, and the specifics of the lidar, IMU and the
+  <code>/cmd_vel</code> chain &mdash; including the gotchas that cost real debugging time. By the
+  end you can explain how a <code>/scan</code> message is born inside Isaac.
+</p>
+
+<div class="toc">
+  <strong>In this lecture</strong>
+  1. What Isaac is &nbsp;&bull;&nbsp; 2. The /World trap &nbsp;&bull;&nbsp; 3. OmniGraph &nbsp;&bull;&nbsp;
+  4. Lidar &rarr; /scan &nbsp;&bull;&nbsp; 5. IMU &rarr; /imu/data &nbsp;&bull;&nbsp; 6. /cmd_vel &rarr; wheels &nbsp;&bull;&nbsp;
+  7. The boot picture &nbsp;&bull;&nbsp; 8. Quiz &nbsp;&bull;&nbsp; 9. Sources
+</div>
+
+<h2>1. What Isaac Sim is</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>NVIDIA <b>Isaac Sim</b> is a robotics simulator on the Omniverse platform. Two pillars:</p>
+  <ul>
+    <li><b>USD (Universal Scene Description)</b> &mdash; the scene format. Everything (robot, room,
+      sensors, lights) is a tree of <b>prims</b> under a root. Our scenes are
+      <code>scene_v&lt;N&gt;.usda</code> (current: <code>scene_v4.usda</code>).</li>
+    <li><b>PhysX</b> &mdash; the physics engine (rigid bodies, joints, drives, collisions).</li>
+  </ul>
+  <p>Two sensor pipelines live inside, and confusing them is a classic mistake:
+  <b>PhysX sensors</b> (IMU, contact &mdash; from physics state) and <b>RTX sensors</b>
+  (lidar, camera &mdash; ray-traced on the GPU; these need a <b>Render Product</b>).</p>
+</div>
+
+<h2>2. The /World convention (silent-failure trap)</h2>
+<div class="box gotcha">
+  <span class="tag">Trap</span>
+  <p>The robot prim <b>must</b> live under <code>/World/&lt;robot&gt;/&hellip;</code>. Place it
+  without the <code>/World</code> wrapper and the <b>RTX sensor pipeline fails silently</b> &mdash;
+  no error, but no <code>/scan</code>. Always <code>/World/cargo_bot/&hellip;</code>.</p>
+</div>
+
+<h2>3. OmniGraph: the visual wiring between Isaac and ROS2</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>Isaac does not magically publish ROS2 topics. You build an <b>OmniGraph</b> (Action Graph): a
+  node graph where data flows from a <b>tick</b>, through sensor-reader nodes, into
+  ROS2-publisher nodes. Bridge nodes live under <code>isaacsim.ros2.bridge.*</code> (Isaac 5.1;
+  older <code>omni.isaac.ros2.*</code> docs do not apply).</p>
+  <p>Every publishing graph needs: a <b>tick</b> (<code>OnPlaybackTick</code>, fires per sim
+  frame), a <b>ROS2Context</b> (provides DDS context/DOMAIN_ID), and a <b>simulation-time</b>
+  source feeding the message timestamp (so <code>use_sim_time</code> works downstream).</p>
+</div>
+<div class="box gotcha">
+  <span class="tag">Trap</span>
+  <p>No tick &rarr; no messages. <b>Nothing publishes unless Isaac is in Play.</b> (This is why
+  "map does not appear" so often traces back to "Isaac is not in Play".)</p>
+</div>
+
+<h2>4. The RTX lidar &rarr; <code>/scan</code></h2>
+<figure class="diagram">
+<svg viewBox="0 0 760 170" role="img" aria-label="Lidar OmniGraph chain">
+  <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0a7d8c"/></marker></defs>
+  <rect class="n-node" x="10"  y="60" width="120" height="46" rx="8"/><text class="n-label" x="70"  y="83" text-anchor="middle">OnPlayback</text><text class="n-sub" x="70" y="97" text-anchor="middle">Tick</text>
+  <rect class="n-node" x="170" y="60" width="130" height="46" rx="8"/><text class="n-label" x="235" y="83" text-anchor="middle">CreateRender</text><text class="n-sub" x="235" y="97" text-anchor="middle">Product (lidar)</text>
+  <rect class="n-node" x="345" y="60" width="150" height="46" rx="8"/><text class="n-label" x="420" y="83" text-anchor="middle">RtxLidarHelper</text><text class="n-sub" x="420" y="97" text-anchor="middle">type=laser_scan</text>
+  <rect class="n-ext"  x="560" y="60" width="120" height="46" rx="8"/><text class="n-label" x="620" y="87" text-anchor="middle">/scan</text>
+  <rect class="n-node" x="345" y="10" width="150" height="32" rx="8"/><text class="n-label" x="420" y="31" text-anchor="middle">ROS2Context</text>
+  <line class="e-line" x1="130" y1="83" x2="170" y2="83"/>
+  <line class="e-line" x1="300" y1="83" x2="345" y2="83"/>
+  <line class="e-line" x1="495" y1="83" x2="560" y2="83"/>
+  <line class="e-line" x1="420" y1="42" x2="420" y2="60"/>
+</svg>
+<figcaption>The lidar graph. The Render Product must be created separately and point at the
+OmniLidar prim; the helper does not auto-create it.</figcaption>
+</figure>
+<div class="box gotcha">
+  <span class="tag">Trap &mdash; the off-by-one</span>
+  <p>Isaac's RTX lidar emitted <b>1066</b> readings while slam_toolbox expected <b>1067</b>, so
+  SLAM rejected <em>every</em> scan. Fix: a republisher node <code>scan_angle_fixer</code> that
+  rewrites the metadata and outputs <code>/scan_fixed</code>. That is why the whole downstream
+  stack subscribes to <code>/scan_fixed</code>, never <code>/scan</code>.</p>
+</div>
+
+<h2>5. The IMU &rarr; <code>/imu/data</code></h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>The IMU is a <b>PhysX</b> sensor (no Render Product). Chain:
+  <code>OnPlaybackTick &rarr; IsaacReadIMU &rarr; ROS2PublishImu</code>, with ROS2Context and a
+  simulation-time feed for the timestamp.</p>
+</div>
+<div class="box gotcha">
+  <span class="tag">Trap</span>
+  <p><code>IsaacReadIMU.inputs:imuPrim</code> is a <b>target attribute</b>, not a string. Bind it
+  with <code>og.Controller.set(attr, [usdrt.Sdf.Path(...)])</code> &mdash; a <b>list of paths</b>
+  &mdash; or it fails silently. Captured in <code>scripts/setup/add_imu.py</code>; verify with
+  <code>ros2 topic hz /imu/data</code> (~100 Hz).</p>
+</div>
+
+<h2>6. The <code>/cmd_vel</code> &rarr; wheels chain (closing the loop)</h2>
+<div class="box concept">
+  <span class="tag">Concept</span>
+  <p>To drive, the bridge subscribes <code>/cmd_vel</code> and converts it to wheel commands:</p>
+  <pre><code>SubscribeTwist(/cmd_vel) -> Break3Vector x2
+   -> DifferentialController(wheelDist=0.29, wheelRadius=0.1)
+   -> ArticulationController(joints=[left_wheel_joint, right_wheel_joint])</code></pre>
+  <p>The <b>DifferentialController</b> does the diff-drive math (linear.x + angular.z &rarr; each
+  wheel speed); the <b>ArticulationController</b> applies it. Recall Lecture 03: this only moves if
+  the wheel drives have proper damping/stiffness.</p>
+</div>
+
+<h2>7. The boot picture</h2>
+<div class="box project">
+  <span class="tag">In cargo_bot</span>
+  <p>Isaac runs these graphs &rarr; publishes <code>/clock /scan /odom /imu/data /tf</code>,
+  subscribes <code>/cmd_vel</code>. <code>scan_angle_fixer</code> bridges
+  <code>/scan &rarr; /scan_fixed</code>. Everything is timestamped with sim time; downstream nodes
+  run <code>use_sim_time:=true</code>.</p>
+</div>
+<div class="box gotcha">
+  <span class="tag">Trap</span>
+  <p>Pressing Stop/Play resets <code>/clock</code>, which kills the EKF's time continuity &rarr;
+  Ctrl+C and relaunch the ROS2 side. (Why the EKF is clock-sensitive: Lecture 05.)</p>
+</div>
+
+<h2>8. Quiz (self-grading)</h2>
+<div class="quiz" id="quiz"></div>
+
+<h2>9. Go deeper (official sources)</h2>
+<ul class="src">
+  <li>Isaac Sim docs: <a href="https://docs.isaacsim.omniverse.nvidia.com/">docs.isaacsim.omniverse.nvidia.com</a></li>
+  <li>Isaac Sim ROS2 bridge tutorials: <a href="https://docs.isaacsim.omniverse.nvidia.com/latest/ros2_tutorials/index.html">ros2_tutorials</a></li>
+  <li>USD: <a href="https://openusd.org/">openusd.org</a></li>
+</ul>
+
+<div class="next"><b>Next lecture &rarr;</b> <code>LECTURE_05_slam_ekf.html</code> &mdash; building the
+map (slam_toolbox) and fusing odometry + IMU (EKF) for a stable pose.</div>
+
+</div>
+<script src="lectures.js"></script>
+<script>
+renderQuiz('quiz', [
+  { q: 'What is the difference between an RTX sensor and a PhysX sensor in Isaac?',
+    options: ['None', 'RTX sensors (lidar/camera) are ray-traced and need a Render Product; PhysX sensors (IMU) come from physics state', 'PhysX sensors need a Render Product, RTX do not'],
+    answer: 1, explain: 'Only RTX sensors require a Render Product.' },
+  { q: 'Why does nothing publish until you press Play?',
+    options: ['ROS2 is off', 'No Play means no OnPlaybackTick, so the graphs never fire', 'The map is missing'],
+    answer: 1, explain: 'The tick drives the whole publishing graph.' },
+  { q: 'What does scan_angle_fixer fix, and what does the stack subscribe to?',
+    options: ['It fixes colors; stack uses /scan', 'It repairs the 1066-vs-1067 beam-count mismatch; stack uses /scan_fixed', 'It fixes QoS; stack uses /scan'],
+    answer: 1, explain: 'SLAM rejected /scan due to the off-by-one; /scan_fixed is the repaired stream.' },
+  { q: 'Why must IsaacReadIMU.inputs:imuPrim be set as a list of paths, not a string?',
+    options: ['It is a string, the list is wrong', 'It is a target attribute; setting it as a string fails silently', 'For performance'],
+    answer: 1, explain: 'Bind via og.Controller.set with a usdrt.Sdf.Path list.' },
+  { q: 'Where MUST the robot prim live in the USD scene?',
+    options: ['Anywhere', 'Under /World/<robot>/... or the RTX sensor pipeline fails silently', 'Under /Root'],
+    answer: 1, explain: 'The /World wrapper is required for the RTX pipeline.' }
+]);
+</script>
+</body>
+</html>
