@@ -279,6 +279,9 @@ Entregables:
 - `cargo_bot_navigation/maps/` (mapas guardados)
 
 ### Fase 4a: Navegacion Autonoma (Nav2 core, sin safety layers)
+**✅ COMPLETA (2026-06-04):** robot navega a goals en RViz/Isaac sobre `cuarto_v1`, llega sin
+chocar; AMCL localiza (nube de partículas concentrada), costmaps + DWB + NavFn OK. Falta solo
+el tuning fino (inflation/recovery, waypoints) — tarea "Nav2 tuning" en la app Plan (07-jun).
 **Objetivo:** Robot navega de A a B esquivando obstaculos del mapa, en condiciones limpias.
 **Done cuando:** Goal en RViz2 → robot llega sin chocar (escena sin obstáculos dinámicos, sin perturbaciones).
 **Dependencia:** Fase 3 (mapa).
@@ -344,6 +347,9 @@ Entregables:
 **Done cuando:** Misión `laundry_pickup_simulation` (versión sin ascensor) corre end-to-end desde tablet via REST API.
 **Dependencia:** Fase 4c (Nav2 + camera + AprilTag funcionando).
 **Quien:** Usuario implementa. Claude guia arquitectura del DSL + REST.
+**Sub-fases** (ver Action Plan en Obsidian): **5a** Mission DSL + cargo state machine (pasos 1-2),
+**5b** Hatch + cargo handling (paso 3), **5c** Interfaz operador REST + tablet (pasos 4-6),
+**5d** LED status indicators (paso 7).
 
 Regla del proyecto recordada acá: **primero que el robot ande (Fases 3-4 completas), después alto nivel (esta fase).**
 
@@ -364,26 +370,40 @@ Entregables:
 - `cargo_bot_description/urdf/hatch.xacro` (joint revolute + actuator)
 - `cargo_bot_behaviors/` package extendido con `hatch_controller`, `cargo_state_machine`, `led_status_publisher`
 
-### Fase 6: Hardware (STM32 + Motores + PCB)
-**Objetivo:** Electronica funcionando en banco.
-**Done cuando:** Motores giran con PID correcto, encoders reportan ticks.
-**Dependencia:** Diseno electronico del usuario.
-**Quien:** Pendiente.
+### Fase 6: Preparacion de Hardware (diseno, SIN tocar la realidad todavia)
+**Objetivo:** Definir y disenar el HW que va a usar el robot.
+**Done cuando:** Lista de componentes cerrada + diseno mecanico + esquematico/PCB en KiCad listos.
+**Dependencia:** Ninguna dura (se puede ir haciendo en paralelo a la sim).
+**Quien:** Usuario disena (es su terreno de electronica). Claude investiga trade-offs + guia.
 
-Decisiones pendientes:
+Pasos / decisiones:
 - Modelo STM32
-- Motores (RPM, torque, encoder CPR)
+- Motores (RPM, torque, encoder CPR) + drivers (VNH5019 / TB6612FNG)
+- Gestion de energia (Buck 11.1V -> 5V para LiDAR y RPi)
 - micro-ROS vs protocolo serial custom
-- Protocolo serial (formato frame, comandos)
+- Diseno mecanico del robot + PCB (KiCad)
 
-### Fase 7: Integracion Real
-**Objetivo:** Robot fisico navega con Nav2.
-**Done cuando:** Robot real navega de A a B en el espacio fisico.
-**Dependencia:** Fase 1 + Fase 6.
-**Quien:** Pendiente.
+### Fase 7: Capstone en Simulador (multi-piso + ascensor + laundry pickup)
+**Objetivo:** La mision north-star corriendo end-to-end EN SIMULACION: recoger ropa y
+transportarla entre pisos via ascensor.
+**Done cuando:** `laundry_pickup` con ascensor corre end-to-end en Isaac, integrando Nav2 +
+safety + camara + misiones.
+**Dependencia:** Fase 5 (misiones) + 4b (safety/geofencing) + 4c (camara).
+**Quien:** Usuario implementa. Claude guia integracion + multi-piso/ascensor.
+
+Piezas nuevas: mapas multi-piso, interaccion con ascensor (boton/espera), geofencing duro de
+escaleras, person-detection priorities.
+
+### Fase 8: Bring-up Real (CONDICIONAL — depende de conseguir trabajo / recursos)
+**Objetivo:** Robot fisico funcionando y navegando con Nav2.
+**Done cuando:** Motores giran con PID + encoders reportan ticks (banco), y el robot real
+navega de A a B en el espacio fisico.
+**Dependencia:** Fase 6 (HW disenado y conseguido) + Fase 7 (stack validado en sim).
+**Quien:** Pendiente. Opcional por ahora (gated por recursos).
 
 Entregables:
-- `cargo_bot_hardware/` — ros2_control plugin (C++)
+- HW armado (PCB fabricada, motores, encoders)
+- `cargo_bot_hardware/` — ros2_control plugin (C++) + protocolo serial / micro-ROS
 - `cargo_bot_bringup/launch/real_robot.launch.py`
 - Parametros Nav2 retuneados para hardware real
 

@@ -158,8 +158,8 @@ amcl:
 - `set_initial_pose + initial_pose`: AMCL **no puede** adivinar dónde estás en todo el
   mapa de cero (kidnapped robot problem). Necesita un empujón inicial. Como en sim el
   robot spawnea siempre en la misma pose, le decimos esa pose acá y la nube de
-  partículas nace concentrada ahí. **Acción pendiente:** confirmar la pose real de
-  spawn (sección 6.2). Si no es (0,0,0), ajustá estos valores.
+  partículas nace concentrada ahí. ✅ **Confirmado 2026-06-04** (sección 6.2): spawn en
+  (0,0,0), así que estos valores quedan tal cual.
 - `robot_model_type: DifferentialMotionModel`: tu robot gira en el lugar y avanza, no
   estrafea. El modelo diferencial ignora `alpha5`.
 - `scan_topic: /scan_fixed`: si apuntás a `/scan` (1066 vs 1067), AMCL puede rechazar
@@ -695,9 +695,13 @@ source install/setup.bash
 
 ### 6.2 — Confirmar la pose de spawn (para `initial_pose` de AMCL)
 
-Con Isaac corriendo `scene_v4.usda` ▶ Play y `slam.launch.py` activo (de Fase 3):
+Con Isaac corriendo `scene_v4.usda` ▶ Play y `slam.launch.py` activo (de Fase 3),
+en una terminal WSL nueva:
 
 ```bash
+cd /mnt/c/Users/agusp/cargo_bot_ws
+source config/source_ros_wsl.sh
+source install/setup.bash
 ros2 run tf2_ros tf2_echo map base_footprint
 ```
 
@@ -705,30 +709,72 @@ Anotá la traslación `(x, y)` y el yaw. Si NO es ~(0,0,0), poné esos valores e
 `amcl.initial_pose` (sección 3.1) y rebuildeá. (Para Nav2 no necesitás SLAM corriendo;
 SLAM acá es solo para leer la pose una vez.)
 
+> ✅ **CONFIRMADO 2026-06-04:** el robot spawnea EXACTO en el origen
+> (`Translation [0,0,0]`, rotación identidad). El `initial_pose (0,0,0)` del bloque AMCL
+> (3.1) ya es correcto — **no hay que tocar nada** ni rebuildear por esto.
+
+> ⚠️ **Recordá frenar el SLAM (Ctrl+C) apenas leíste la pose.** A partir de acá la
+> localización la hace AMCL, y SLAM + AMCL no conviven (los dos publican `map → odom`).
+
 ### 6.3 — Boot de Fase 4
 
+> ⚠️ **GAP IMPORTANTE (verificado 2026-06-04):** NINGÚN launch levanta el
+> `scan_angle_fixer` sin slam_toolbox. El reparto real de los launch es:
+> - `localization.launch.py` = base (RSP + JSP + EKF). **NO incluye scan_fixer.**
+> - `slam.launch.py` = base + scan_fixer + **slam_toolbox** (no lo querés acá).
+> - `navigation.launch.py` = map_server + amcl + stack Nav2 + twist_mux. **Asume que
+>   `/scan_fixed` ya existe — NO lo genera.**
+>
+> Como AMCL/costmaps necesitan `/scan_fixed` y NO querés slam_toolbox, hay que correr el
+> `scan_angle_fixer` aparte (1 `ros2 run`, defaults `/scan → /scan_fixed`). Por eso van
+> **3 terminales WSL**. Cada terminal nueva empieza con el preámbulo (`cd` + 2 `source`).
+
 ```bash
-# 1) Isaac (Windows): launch_all.cmd → abrir scene_v4.usda → ▶ Play
-# 2) WSL terminal A — bringup base (scan_fixer + EKF + RSP, SIN slam_toolbox):
-#    (si tu slam.launch.py arranca slam_toolbox, hacé un launch base o comentá esa parte;
-#     Nav2 trae su propia localización con AMCL, NO querés slam_toolbox al mismo tiempo)
+# ── 0) Isaac (Windows): launch_all.cmd → abrir scene_v4.usda → ▶ Play ──
+
+# ── Terminal A — base (RSP + JSP + EKF) ──
+cd /mnt/c/Users/agusp/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
+ros2 launch cargo_bot_bringup localization.launch.py
 
-# 3) WSL terminal B — Nav2:
+# ── Terminal B — scan_angle_fixer (genera /scan_fixed) ──
+cd /mnt/c/Users/agusp/cargo_bot_ws
+source config/source_ros_wsl.sh
+source install/setup.bash
+ros2 run cargo_bot_bringup scan_angle_fixer --ros-args -p use_sim_time:=true
+# OK = log "scan_angle_fixer up: /scan -> /scan_fixed (mode=shrink_angle_max)"
+
+# ── Terminal C — Nav2 (map_server + amcl + stack) ──
+cd /mnt/c/Users/agusp/cargo_bot_ws
+source config/source_ros_wsl.sh
+source install/setup.bash
 ros2 launch cargo_bot_bringup navigation.launch.py
 ```
+
+> Para la tarea de SOLO localización (AMCL), lo único que importa de la Terminal C es que
+> `map_server` y `amcl` lleguen a `active`. Que arranque también el stack de navegación
+> (controller/planner/bt) no molesta y pre-valida la tarea siguiente.
 
 > ⚠️ **No corras slam_toolbox y AMCL al mismo tiempo**: ambos quieren publicar `map → odom`.
 > En Fase 4 la localización la hace AMCL. Necesitás que sigan vivos: `scan_angle_fixer`,
 > el EKF, y el robot_state_publisher (la TF `base_link→sensores` viene de Isaac).
 
+> Nota: `navigation.launch.py` **no** levanta RViz (a diferencia de `slam.launch.py`).
+> Para el paso 6.5 abrí RViz aparte:
+> `ros2 run rviz2 rviz2 -d $(ros2 pkg prefix cargo_bot_description)/share/cargo_bot_description/rviz/cargo_bot.rviz`
+
 ### 6.4 — Verificación (en orden)
 
 ```bash
+# ── Preámbulo (Terminal nueva, SIEMPRE) ──
+cd /mnt/c/Users/agusp/cargo_bot_ws
+source config/source_ros_wsl.sh
+source install/setup.bash
+
 # a) Datos crudos llegan
 ros2 topic echo /scan_fixed --once     # ranges con valores, no todo inf/0
-ros2 topic hz /clock                   # ~ rate de Isaac
+ros2 topic hz /clock                   # ~ rate de Isaac (Ctrl+C tras unas lineas)
 
 # b) Todos los nodos lifecycle llegaron a "active"
 ros2 lifecycle get /map_server         # → active
@@ -749,17 +795,54 @@ ros2 run tf2_tools view_frames
 ros2 topic info /cmd_vel               # publisher = twist_mux
 ```
 
-### 6.5 — Mandar un goal en RViz
+### 6.5 — Ver la nube de partículas en RViz (verificación de LOCALIZACIÓN, Fase 4a)
 
-1. Abrí RViz con `cargo_bot.rviz` (ya tiene configurado "2D Goal Pose" → `/goal_pose`).
+Este es el "done" de la tarea de localización (AMCL), sin mandar ningún goal todavía.
+
+```bash
+# Terminal nueva — abrir RViz (navigation.launch.py NO lo levanta solo)
+cd /mnt/c/Users/agusp/cargo_bot_ws
+source config/source_ros_wsl.sh
+source install/setup.bash
+ros2 run rviz2 rviz2 -d $(ros2 pkg prefix cargo_bot_description)/share/cargo_bot_description/rviz/cargo_bot.rviz
+```
+
+> ⚠️ El `cargo_bot.rviz` viene de Fase 3 (SLAM) y **NO trae el display de AMCL**. Hay que
+> agregarlo a mano (paso 3). Si querés, después guardás el `.rviz` con el display ya puesto.
+
+1. **Fixed Frame** (*Global Options*, arriba izq) → `map`. Si queda en rojo
+   "does not exist", revisá que la Terminal C (Nav2) siga viva.
+2. **Add → By topic → `/map` → Map** → deberías ver el plano del `cuarto_v1`.
+3. **Add → By topic → `/particle_cloud`** → la nube de partículas de AMCL
+   (tipo `nav2_msgs/ParticleCloud` en Humble). Si RViz no ofrece display para ese tipo,
+   usá un **PoseArray** sobre `/particle_cloud`, o el display **"Amcl Particle Swarm"**.
+   - 👈 **GOTCHA QoS (verificado 2026-06-04):** AMCL publica `/particle_cloud` como
+     **BEST_EFFORT**, y el display de RViz lo pide **RELIABLE** por default → incompatibles
+     → warning `incompatible QoS ... RELIABILITY_QOS_POLICY` y **no se ve la nube**. Fix:
+     expandí el display → **Topic → Reliability Policy → "Best Effort"**. (Mismo criterio
+     que `/scan` y `/odom`, también best-effort.)
+
+**✅ Done de localización (Fase 4a):** ves el mapa + una **nube de flechitas concentrada
+y apretada sobre el robot** (no desparramada por todo el mapa). Como `amcl` tiene
+`set_initial_pose: true` con `initial_pose (0,0,0)`, la nube **nace ya concentrada** en el
+origen. Si saliera dispersa, usá una vez el botón **"2D Pose Estimate"** clickeando sobre
+el robot y apuntando hacia adelante.
+
+> Tip: si después movés el robot (teleop o un goal), la nube debe **seguirlo y achicarse**
+> a medida que AMCL gana confianza con `/scan_fixed`. Eso confirma que la localización está
+> viva, no congelada.
+
+### 6.6 — Mandar un goal en RViz (verificación de NAVEGACIÓN — tarea siguiente)
+
+> Esto ya es la tarea de navegación, no la de localización. Requiere el stack Nav2
+> (controller/planner/bt) activo, que `navigation.launch.py` ya levanta.
+
+1. Con RViz abierto (6.5) — `cargo_bot.rviz` ya tiene configurado "2D Goal Pose" → `/goal_pose`.
 2. **Fixed Frame = `map`**.
-3. Deberías ver: el mapa (`/map`), el costmap, y la nube de partículas de AMCL.
-4. Como usamos `set_initial_pose`, la nube ya debería estar concentrada en el robot. Si
-   no, usá el botón **"2D Pose Estimate"** una vez.
-5. Botón **"2D Goal Pose"** → clickeá un destino en el mapa → el robot debería planear
+3. Botón **"2D Goal Pose"** → clickeá un destino en el mapa → el robot debería planear
    (línea) y navegar sin chocar.
 
-**✅ Done de Step 1 (= Fase 4a):** goal en RViz → el robot llega sin chocar, en escena
+**✅ Done de Step 1 (= navegación):** goal en RViz → el robot llega sin chocar, en escena
 limpia (sin obstáculos dinámicos).
 
 ---
@@ -835,6 +918,7 @@ Re-verificá igual que en 6.4-6.5. Si quedó suave → Fase 4a + suavizado cerra
 | El costmap no muestra obstáculos | El obstacle layer apunta a `/scan` en vez de `/scan_fixed` | Corregí en AMBOS costmaps (3.7 y 3.8) |
 | El robot se mueve pero ignora al twist_mux | El controller publica directo a `/cmd_vel` (falta el remap) | Remap `cmd_vel → cmd_vel_nav` en el controller (sección 5) |
 | AMCL nunca converge / robot "salta" en el mapa | `initial_pose` mal, o `scan_topic` apunta a `/scan` | Confirmá pose de spawn (6.2); usá `/scan_fixed` |
+| RViz: warning `incompatible QoS ... RELIABILITY_QOS_POLICY` en `/particle_cloud` y no se ve la nube | AMCL publica BEST_EFFORT, el display RViz pide RELIABLE | Display `/particle_cloud` → Topic → **Reliability Policy → Best Effort** (sec 6.5) |
 | Topics no aparecen | Discovery Server / DOMAIN_ID | `source config/source_ros_wsl.sh`; `ROS_DOMAIN_ID=1`; Discovery Server vivo |
 | Todo andaba y de golpe se rompió tras Stop/Play en Isaac | Stop/Play resetea `/clock` y mata el EKF | Ctrl+C + relanzar el bringup y Nav2 |
 
@@ -842,7 +926,9 @@ Re-verificá igual que en 6.4-6.5. Si quedó suave → Fase 4a + suavizado cerra
 
 ## 9. Decisiones abiertas (para vos)
 
-1. **Pose de spawn**: confirmar `initial_pose` real (sección 6.2). Default asumido (0,0,0).
+1. ~~**Pose de spawn**: confirmar `initial_pose` real (sección 6.2).~~ ✅ **RESUELTO
+   2026-06-04**: spawn confirmado en (0,0,0) con `tf2_echo map base_footprint`. El
+   `initial_pose (0,0,0)` queda como está.
 2. **Footprint**: arrancamos con `robot_radius: 0.18` (círculo, simple). Si la base es
    más rectangular y roza, pasamos a `footprint` poligonal.
 3. **`obstacle_max_range`**: 5.0 vs 6.0 — según si querés marcar todo el cuarto desde una
