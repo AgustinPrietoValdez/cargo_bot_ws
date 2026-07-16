@@ -72,7 +72,7 @@ Primero hay que compilar el paquete y generar el `.urdf` final desde los `.xacro
 ```bash
 # En WSL2
 source /opt/ros/humble/setup.bash
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 colcon build --packages-select cargo_bot_description
 source install/setup.bash
 
@@ -86,8 +86,8 @@ check_urdf /tmp/cargo_bot.urdf
 # Generar version para Isaac Sim (paths absolutos de Windows)
 # Isaac Sim NO entiende package:// asi que reemplazamos los paths
 xacro src/cargo_bot_description/urdf/cargo_bot.urdf.xacro \
-  | sed 's|package://cargo_bot_description/|C:/Users/agusp/cargo_bot_ws/src/cargo_bot_description/|g' \
-  > /mnt/c/Users/agusp/cargo_bot_ws/cargo_bot_isaac.urdf
+  | sed 's|package://cargo_bot_description/|C:/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/|g' \
+  > /mnt/c/Users/agusp/Documentos/cargo_bot_ws/cargo_bot_isaac.urdf
 ```
 
 > **Importante:** Los xacro originales usan `package://` y eso es CORRECTO para ROS 2
@@ -106,7 +106,7 @@ Antes de importar, confirmar que la extension este habilitada:
 ### 2.3 Importar en Isaac Sim
 
 1. En Isaac Sim: **File → Import**
-2. Seleccionar `C:\Users\agusp\cargo_bot_ws\cargo_bot.urdf`
+2. Seleccionar `C:\Users\agusp\Documentos\cargo_bot_ws\cargo_bot.urdf`
 3. Se abre un panel con las opciones de importacion. Configurar:
 
 | Opcion | Valor | Por que |
@@ -258,7 +258,7 @@ Crear un archivo `rplidar_a1_config.json`:
 }
 ```
 
-Guardar en: `C:\Users\agusp\cargo_bot_ws\config\rplidar_a1_config.json`
+Guardar en: `C:\Users\agusp\Documentos\cargo_bot_ws\config\rplidar_a1_config.json`
 Y referenciarlo en las propiedades del sensor RTX Lidar → **Sensor Config File**.
 
 ### 4.3 Verificar el sensor
@@ -431,7 +431,7 @@ ROS2 Context [Context] ──► ROS2 Publish Clock [Context]
 
 ### 5.4 Guardar la escena
 
-**File → Save As** → `C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scenes\cargo_bot_scene.usd`
+**File → Save As** → `C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scenes\cargo_bot_scene.usd`
 
 > Guarda seguido. Isaac Sim puede crashear y perdes el Action Graph.
 
@@ -498,8 +498,8 @@ Para cada pared:
 Abrir **3 terminales** en WSL2. En cada una:
 
 ```bash
-source /mnt/c/Users/agusp/cargo_bot_ws/config/source_ros_wsl.sh
-source /mnt/c/Users/agusp/cargo_bot_ws/install/setup.bash
+source /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/source_ros_wsl.sh
+source /mnt/c/Users/agusp/Documentos/cargo_bot_ws/install/setup.bash
 ```
 
 ### 7.2 Checklist de verificacion

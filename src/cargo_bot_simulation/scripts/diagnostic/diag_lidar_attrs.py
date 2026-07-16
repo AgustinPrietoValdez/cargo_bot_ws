@@ -2,7 +2,7 @@
 # Slamtec config actually loaded.  If all the omni:sensor:Core:* fields are
 # default/empty, the config didn't apply and the sensor won't fire.
 import omni.usd
-OUT = "C:/Users/agusp/cargo_bot_ws/src/cargo_bot_simulation/scripts/diag_lidar_attrs.txt"
+OUT = "C:/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_simulation/scripts/diag_lidar_attrs.txt"
 
 stage = omni.usd.get_context().get_stage()
 lines = []

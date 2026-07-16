@@ -9,13 +9,13 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/visual/base_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/visual/base_link.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/collision/base_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/collision/base_link.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
     <inertial>
@@ -33,12 +33,12 @@
   <link name="lidar_link">
     <visual>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/visual/lidar.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/visual/lidar.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/collision/lidar.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/collision/lidar.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
     <inertial>
@@ -71,12 +71,12 @@
   <link name="left_wheel_link">
     <visual>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/visual/left_wheel.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/visual/left_wheel.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/collision/left_wheel.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/collision/left_wheel.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
     <inertial>
@@ -95,12 +95,12 @@
   <link name="right_wheel_link">
     <visual>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/visual/right_wheel.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/visual/right_wheel.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/collision/right_wheel.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/collision/right_wheel.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
     <inertial>
@@ -119,12 +119,12 @@
   <link name="caster_wheel_link">
     <visual>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/visual/caster_wheel.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/visual/caster_wheel.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </visual>
     <collision>
       <geometry>
-        <mesh filename="/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/meshes/collision/caster_wheel.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/meshes/collision/caster_wheel.stl" scale="0.001 0.001 0.001"/>
       </geometry>
     </collision>
     <inertial>

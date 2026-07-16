@@ -1,10 +1,10 @@
 #!/bin/bash
 # Source this file in WSL2 before running any ROS 2 nodes for cargo_bot
-# Usage: source /mnt/c/Users/agusp/cargo_bot_ws/config/source_ros_wsl.sh
+# Usage: source /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/source_ros_wsl.sh
 
 export ROS_DOMAIN_ID=1
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export FASTRTPS_DEFAULT_PROFILES_FILE=/mnt/c/Users/agusp/cargo_bot_ws/config/fastdds_wsl.xml
+export FASTRTPS_DEFAULT_PROFILES_FILE=/mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/fastdds_wsl.xml
 
 source /opt/ros/humble/setup.bash
 

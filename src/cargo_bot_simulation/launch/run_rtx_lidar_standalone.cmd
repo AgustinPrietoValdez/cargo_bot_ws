@@ -18,7 +18,7 @@ if "!WSL_IP!"=="" (
 echo WSL2 IP detected: !WSL_IP!
 
 REM Patch fastdds_isaac.xml RemoteServer address (same regex as launch_isaac_ros.cmd)
-set "XML_FILE=C:\Users\agusp\cargo_bot_ws\config\fastdds_isaac.xml"
+set "XML_FILE=C:\Users\agusp\Documentos\cargo_bot_ws\config\fastdds_isaac.xml"
 powershell -NoProfile -Command "$p='%XML_FILE%'; $c=[IO.File]::ReadAllText($p); $new=[regex]::Replace($c, '(<RemoteServer[^>]*?>\s*<metatrafficUnicastLocatorList>\s*<locator>\s*<udpv4>\s*<address>)[^<]+', '${1}!WSL_IP!'); [IO.File]::WriteAllText($p, $new, (New-Object System.Text.UTF8Encoding $false))"
 
 set ROS_DOMAIN_ID=1

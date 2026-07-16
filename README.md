@@ -160,7 +160,7 @@ config\launch_all.cmd
 # 2. Isaac Sim: open scene_v4.usda and press ▶ Play
 
 # 3. WSL: source the environment
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 

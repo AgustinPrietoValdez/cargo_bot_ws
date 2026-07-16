@@ -56,11 +56,11 @@ limpio (ver memo `isaac51-rtx-lidar-actiongraph`).
    sesión Isaac headless; necesita el GPU exclusivo).
 2. Asegurate que el Discovery Server esté corriendo en WSL:
    ```
-   wsl -d Ubuntu-22.04 -- bash /mnt/c/Users/agusp/cargo_bot_ws/config/start_discovery_server.sh
+   wsl -d Ubuntu-22.04 -- bash /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/start_discovery_server.sh
    ```
 3. Doble click en:
    ```
-   C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\launch\run_standalone_lidar.cmd
+   C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\launch\run_standalone_lidar.cmd
    ```
 4. Esperá ~30-90s en la consola hasta ver `[standalone_lidar] PLAYING.`
 5. **Dejá esa consola ABIERTA** mientras querés que el lidar publique.
@@ -79,7 +79,7 @@ ros2 topic echo /scan_py --once   # esperado frame_id="lidar_link", ~1066 ranges
 Si el lidar deja de publicar y querés ver qué pasa adentro del stage:
 
 1. Con Isaac corriendo (GUI o standalone), abrí Script Editor (Window → Script Editor).
-2. **File → Open** → `C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scripts\diag_lidar.py`
+2. **File → Open** → `C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scripts\diag_lidar.py`
 3. **Run**.
 4. Revisá el output en `scripts/diag_output.txt` (mismo directorio).
 

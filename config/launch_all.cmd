@@ -11,7 +11,7 @@ echo === Cargo Bot: Full Stack Launcher ===
 echo.
 echo [1/2] Starting Discovery Server in WSL (separate window)...
 
-start "Cargo Bot Discovery Server" cmd /k "wsl.exe -d Ubuntu-22.04 -- bash /mnt/c/Users/agusp/cargo_bot_ws/config/start_discovery_server.sh"
+start "Cargo Bot Discovery Server" cmd /k "wsl.exe -d Ubuntu-22.04 -- bash /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/start_discovery_server.sh"
 
 echo       Waiting 4s for fastdds to bind to port 11811...
 timeout /t 4 /nobreak >nul

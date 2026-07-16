@@ -10,7 +10,7 @@ REM
 REM PREREQUISITE: Close the Isaac Sim GUI window before running this.
 REM
 REM USAGE (Windows cmd / PowerShell):
-REM   C:\Users\agusp\cargo_bot_ws\run_standalone_lidar.cmd
+REM   C:\Users\agusp\Documentos\cargo_bot_ws\run_standalone_lidar.cmd
 REM ====================================================================
 
 setlocal EnableDelayedExpansion
@@ -35,7 +35,7 @@ REM the WSL Discovery Server (SERVER 127.0.0.1:11811 inside WSL,
 REM portproxy'd to WSL_IP:11811 from Windows).  Same regex as the
 REM working run_rtx_lidar_standalone.cmd.
 REM ------------------------------------------------------------------
-set "XML_FILE=C:\Users\agusp\cargo_bot_ws\config\fastdds_isaac.xml"
+set "XML_FILE=C:\Users\agusp\Documentos\cargo_bot_ws\config\fastdds_isaac.xml"
 powershell -NoProfile -Command "$p='%XML_FILE%'; $c=[IO.File]::ReadAllText($p); $new=[regex]::Replace($c, '(<RemoteServer[^>]*?>\s*<metatrafficUnicastLocatorList>\s*<locator>\s*<udpv4>\s*<address>)[^<]+', '${1}!WSL_IP!'); [IO.File]::WriteAllText($p, $new, (New-Object System.Text.UTF8Encoding $false))"
 
 REM ------------------------------------------------------------------
@@ -56,6 +56,6 @@ echo (takes 30-90s to load the scene before /scan_py appears)
 echo Ctrl-C in this terminal to stop.
 echo.
 
-"C:\isaacsim_51_ga\python.bat" "C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scripts\standalone_lidar_publisher.py"
+"C:\isaacsim_51_ga\python.bat" "C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scripts\standalone_lidar_publisher.py"
 
 endlocal

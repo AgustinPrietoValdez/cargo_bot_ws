@@ -1,12 +1,12 @@
 # Runtime diagnostic for the RTX Lidar pipeline.
-# Writes output to C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scripts\diag_output.txt
+# Writes output to C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scripts\diag_output.txt
 # Run in Isaac Sim Script Editor with Isaac in Play.
 import omni.usd
 from pxr import Usd, UsdRender
 
 stage = omni.usd.get_context().get_stage()
 
-OUT = "C:/Users/agusp/cargo_bot_ws/src/cargo_bot_simulation/scripts/diag_output.txt"
+OUT = "C:/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_simulation/scripts/diag_output.txt"
 lines = []
 
 def w(s):
