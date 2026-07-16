@@ -4,7 +4,7 @@
 > accumulated dead Replicator render products, a double articulation root,
 > and a broken IsaacCreateRenderProduct OG node. This guide rebuilds the
 > scene cleanly on Isaac Sim 5.1.0-rc.19 with the URDF at
-> `C:\Users\agusp\cargo_bot_ws\cargo_bot_isaac.urdf`.
+> `C:\Users\agusp\Documentos\cargo_bot_ws\cargo_bot_isaac.urdf`.
 >
 > **Target output:** `src/cargo_bot_simulation/scenes/scene_v2.usda`
 > (USDA text, not binary, NOT overwriting `scene.usda`).
@@ -39,10 +39,10 @@ already.
 ```text
 [ ] Close every running Isaac Sim window (Task Manager: kill kit.exe if any).
 [ ] In WSL, start the Discovery Server in a dedicated terminal:
-        bash /mnt/c/Users/agusp/cargo_bot_ws/config/start_discovery_server.sh
+        bash /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/start_discovery_server.sh
     Leave it running for the whole session.
 [ ] cargo_bot_isaac.urdf must exist:
-        dir C:\Users\agusp\cargo_bot_ws\cargo_bot_isaac.urdf
+        dir C:\Users\agusp\Documentos\cargo_bot_ws\cargo_bot_isaac.urdf
     (If missing, regenerate per docs/FASE2_GUIA_ISAAC_SIM.md section 2.1.)
 [ ] Free at least 4 GB of VRAM (close Chrome/games).
 ```
@@ -51,7 +51,7 @@ already.
 
 ## Step 1 -- Launch Isaac GUI cleanly
 
-1. Double-click `C:\Users\agusp\cargo_bot_ws\config\launch_isaac_ros.cmd`.
+1. Double-click `C:\Users\agusp\Documentos\cargo_bot_ws\config\launch_isaac_ros.cmd`.
 2. Wait for the splash, then the empty Isaac Sim window.
 3. **Verify env** -- open `Window -> Script Editor`, paste and Run:
    ```python
@@ -63,7 +63,7 @@ already.
    ```
    ROS_DOMAIN_ID = 1
    RMW_IMPLEMENTATION = rmw_fastrtps_cpp
-   FASTRTPS_DEFAULT_PROFILES_FILE = C:\Users\agusp\cargo_bot_ws\config\fastdds_isaac.xml
+   FASTRTPS_DEFAULT_PROFILES_FILE = C:\Users\agusp\Documentos\cargo_bot_ws\config\fastdds_isaac.xml
    ```
 4. Confirm the ROS 2 bridge is alive -- in the same Script Editor:
    ```python
@@ -84,13 +84,13 @@ Close Isaac and re-launch from the `.cmd` (NOT from Start Menu).
 ## Step 2 -- Import the URDF
 
 1. `File -> Import...` (NOT `File -> Open`).
-2. Navigate to and select `C:\Users\agusp\cargo_bot_ws\cargo_bot_isaac.urdf`.
+2. Navigate to and select `C:\Users\agusp\Documentos\cargo_bot_ws\cargo_bot_isaac.urdf`.
 3. The URDF Importer dialog opens. Set fields exactly as below
    (ref: <https://docs.isaacsim.omniverse.nvidia.com/5.1.0/importer_exporter/ext_isaacsim_asset_importer_urdf.html>):
 
    | Field                          | Value                                  |
    | ------------------------------ | -------------------------------------- |
-   | Output Directory               | `C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scenes\imported_urdf` |
+   | Output Directory               | `C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scenes\imported_urdf` |
    | Merge Fixed Joints             | **OFF** (we need `lidar_link` as a discoverable Xform) |
    | Fix Base Link                  | **OFF** (mobile base, not a fixed arm) |
    | Self-Collision                 | **OFF**                                |
@@ -252,7 +252,7 @@ and is selected by the config string `"Slamtec/RPLIDAR_S2E"`.
 > path.
 
 1. Open the Script Editor: `Window -> Script Editor`.
-2. `File -> Open ...` -> `C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scripts\add_lidar.py`.
+2. `File -> Open ...` -> `C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scripts\add_lidar.py`.
 3. Click **Run** (or Ctrl-Enter).
 4. Expected console output:
    ```
@@ -398,7 +398,7 @@ Run them with `/cargo_bot` selected in the Stage panel.
 1. Press **Play** in the viewport (timeline must be running for the writer
    to spin up its hydra rendergraph).
 2. `Window -> Script Editor` -> `File -> Open ...` ->
-   `C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scripts\publish_lidar.py`.
+   `C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scripts\publish_lidar.py`.
 3. Click **Run**.
 4. Expected console output:
    ```
@@ -465,7 +465,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -p stamped:=fals
 ## Step 10 -- Save the scene
 
 1. `File -> Save As...`
-2. Path: `C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scenes\scene_v2.usda`
+2. Path: `C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scenes\scene_v2.usda`
 3. Format dropdown: select **USDA** (text). NOT `.usd` binary.
 4. Click Save.
 
@@ -473,7 +473,7 @@ ros2 run teleop_twist_keyboard teleop_twist_keyboard --ros-args -p stamped:=fals
 > with no format selector visible. If the filename input shows `.usd`,
 > manually type the `.usda` extension. Verify after save:
 > ```powershell
-> Get-Content C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scenes\scene_v2.usda -TotalCount 2
+> Get-Content C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scenes\scene_v2.usda -TotalCount 2
 > ```
 > First line MUST be `#usda 1.0`. If it's binary garbage, you saved as
 > `.usd` -- delete it, save again with the right extension.

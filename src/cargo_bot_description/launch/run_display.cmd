@@ -1,3 +1,3 @@
 @echo off
 echo Compilando y lanzando RViz2...
-wsl -d Ubuntu-22.04 -- bash -c "source /opt/ros/humble/setup.bash && cd /mnt/c/Users/agusp/cargo_bot_ws && colcon build --packages-select cargo_bot_description && source install/setup.bash && ros2 launch cargo_bot_description display_provisional.launch.py"
+wsl -d Ubuntu-22.04 -- bash -c "source /opt/ros/humble/setup.bash && cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws && colcon build --packages-select cargo_bot_description && source install/setup.bash && ros2 launch cargo_bot_description display_provisional.launch.py"

@@ -688,7 +688,7 @@ def generate_launch_description():
 ### 6.1 — Build
 
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 colcon build --packages-select cargo_bot_navigation cargo_bot_bringup
 source install/setup.bash
 ```
@@ -699,7 +699,7 @@ Con Isaac corriendo `scene_v4.usda` ▶ Play y `slam.launch.py` activo (de Fase 
 en una terminal WSL nueva:
 
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 ros2 run tf2_ros tf2_echo map base_footprint
@@ -733,20 +733,20 @@ SLAM acá es solo para leer la pose una vez.)
 # ── 0) Isaac (Windows): launch_all.cmd → abrir scene_v4.usda → ▶ Play ──
 
 # ── Terminal A — base (RSP + JSP + EKF) ──
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 ros2 launch cargo_bot_bringup localization.launch.py
 
 # ── Terminal B — scan_angle_fixer (genera /scan_fixed) ──
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 ros2 run cargo_bot_bringup scan_angle_fixer --ros-args -p use_sim_time:=true
 # OK = log "scan_angle_fixer up: /scan -> /scan_fixed (mode=shrink_angle_max)"
 
 # ── Terminal C — Nav2 (map_server + amcl + stack) ──
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 ros2 launch cargo_bot_bringup navigation.launch.py
@@ -768,7 +768,7 @@ ros2 launch cargo_bot_bringup navigation.launch.py
 
 ```bash
 # ── Preámbulo (Terminal nueva, SIEMPRE) ──
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 
@@ -801,7 +801,7 @@ Este es el "done" de la tarea de localización (AMCL), sin mandar ningún goal t
 
 ```bash
 # Terminal nueva — abrir RViz (navigation.launch.py NO lo levanta solo)
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 ros2 run rviz2 rviz2 -d $(ros2 pkg prefix cargo_bot_description)/share/cargo_bot_description/rviz/cargo_bot.rviz

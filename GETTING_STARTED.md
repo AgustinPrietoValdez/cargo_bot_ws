@@ -70,7 +70,7 @@ The helper script `config/source_ros_wsl.sh` sets the WSL2 environment (RMW impl
 
 ```bash
 # In WSL2, source the project environment in each new shell:
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 ```
@@ -97,7 +97,7 @@ In Isaac Sim, open the scene **`scene_v4.usda`** (under `src/cargo_bot_simulatio
 
 ### Step 3 — Source the ROS 2 environment (WSL2)
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 source config/source_ros_wsl.sh
 source install/setup.bash
 ```

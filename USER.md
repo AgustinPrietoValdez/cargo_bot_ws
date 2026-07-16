@@ -38,25 +38,25 @@ python "C:\Users\agusp\Documentos\Organization_App\calendar-app\tools\plan_cli.p
 
 **2. WSL terminal A** (base: RSP + JSP + EKF):
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
 ros2 launch cargo_bot_bringup localization.launch.py
 ```
 
 **3. WSL terminal B** (scan fixer; va aparte porque no esta en localization/navigation.launch.py):
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
 ros2 run cargo_bot_bringup scan_angle_fixer --ros-args -p use_sim_time:=true
 ```
 
 **4. WSL terminal C** (Nav2: map_server + AMCL + stack):
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
 ros2 launch cargo_bot_bringup navigation.launch.py
 ```
 
 **5. RViz** (aparte, para ver particulas y mandar goals):
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws && source config/source_ros_wsl.sh && source install/setup.bash
 rviz2
 ```
 - En el display de `/particle_cloud`: Reliability = **Best Effort** (si no, no se ve la nube).

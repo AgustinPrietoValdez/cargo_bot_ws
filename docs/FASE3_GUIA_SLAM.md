@@ -46,17 +46,17 @@ Antes de tocar nada de SLAM, todo el stack de Fase 2 tiene que estar funcionando
 
 ```
 [ ] Discovery Server corriendo en WSL2 (foreground)
-      → bash /mnt/c/Users/agusp/cargo_bot_ws/config/start_discovery_server.sh
+      → bash /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/start_discovery_server.sh
 
 [ ] Isaac Sim lanzado con DDS configurado
-      → Doble click: C:\Users\agusp\cargo_bot_ws\config\launch_isaac_ros.cmd
+      → Doble click: C:\Users\agusp\Documentos\cargo_bot_ws\config\launch_isaac_ros.cmd
 
 [ ] scene_v3.usda abierta y en ▶ Play
       → File → Open → src/cargo_bot_simulation/scenes/scene_v3.usda
 
 [ ] Topics esperados publicando (verificar desde WSL):
       → source /opt/ros/humble/setup.bash
-      → source /mnt/c/Users/agusp/cargo_bot_ws/config/source_ros_wsl.sh
+      → source /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/source_ros_wsl.sh
       → ros2 topic hz /clock     # esperar ~50 Hz
       → ros2 topic hz /odom      # esperar ~50 Hz
       → ros2 topic hz /scan      # esperar ~16 Hz
@@ -93,7 +93,7 @@ El xacro actual tiene `imu_link` declarado como un link **vacío** (`<link name=
 **Archivo a abrir** (en tu editor):
 
 ```
-C:\Users\agusp\cargo_bot_ws\src\cargo_bot_description\urdf\sensors.xacro
+C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_description\urdf\sensors.xacro
 ```
 
 **Localizar las líneas 37-43** (bloque actual del IMU):
@@ -170,7 +170,7 @@ Antes de seguir, validá que el xacro compila:
 
 ```bash
 # En WSL
-cd /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/urdf
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/urdf
 xacro cargo_bot.urdf.xacro > /tmp/test.urdf
 ```
 
@@ -189,7 +189,7 @@ Isaac Sim no entiende xacro — solo URDF puro. Hay que pre-procesar.
 ```bash
 # En WSL
 source /opt/ros/humble/setup.bash
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 colcon build --packages-select cargo_bot_description
 source install/setup.bash
 
@@ -200,10 +200,10 @@ xacro src/cargo_bot_description/urdf/cargo_bot.urdf.xacro > /tmp/cargo_bot.urdf
 check_urdf /tmp/cargo_bot.urdf
 
 # Convertir package:// a absolute paths (Isaac no entiende package://)
-sed 's|package://cargo_bot_description|/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description|g' /tmp/cargo_bot.urdf > /tmp/cargo_bot_isaac.urdf
+sed 's|package://cargo_bot_description|/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description|g' /tmp/cargo_bot.urdf > /tmp/cargo_bot_isaac.urdf
 
 # Copiar a Windows-visible path
-cp /tmp/cargo_bot_isaac.urdf /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/urdf/cargo_bot_isaac.urdf
+cp /tmp/cargo_bot_isaac.urdf /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/urdf/cargo_bot_isaac.urdf
 ```
 
 ### Desglose
@@ -219,7 +219,7 @@ cp /tmp/cargo_bot_isaac.urdf /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_descr
 ### Verificación
 
 ```bash
-ls -la /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_description/urdf/cargo_bot_isaac.urdf
+ls -la /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_description/urdf/cargo_bot_isaac.urdf
 ```
 
 Debería tener fecha de modificación de hace segundos.
@@ -297,7 +297,7 @@ Si lo pasás como string via `keys.SET_VALUES: [("ReadIMU.inputs:imuPrim", "/Wor
 
 1. En Isaac Sim, con scene_v4 abierta (y **NO en Play** todavía):
 2. **Window → Script Editor**
-3. **File → Open...** → seleccionar `C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scripts\setup\add_imu.py`
+3. **File → Open...** → seleccionar `C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scripts\setup\add_imu.py`
 4. Click **Run** (o `Ctrl+Enter`)
 
 Output esperado en el Script Editor console:
@@ -534,7 +534,7 @@ Separar config de launches es convención ROS 2 estándar — facilita reutiliza
 
 ```bash
 # En WSL
-cd /mnt/c/Users/agusp/cargo_bot_ws/src
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src
 
 # Package 1: configs y mapas
 ros2 pkg create --build-type ament_cmake cargo_bot_navigation \
@@ -576,11 +576,11 @@ src/
 ### Crear estructura de carpetas adicional
 
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_navigation
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_navigation
 mkdir -p config maps
 rm -rf include src   # No usamos C++ por ahora
 
-cd /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_bringup
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_bringup
 mkdir -p launch
 ```
 
@@ -980,7 +980,7 @@ Resuelve en runtime al path `install/paquete/share/paquete/`. **Esto es crítico
 
 Concatena partes para formar un path. Cada parte puede ser un string o otra substitution (como `FindPackageShare`). Resuelve en runtime el path completo.
 
-Ejemplo: `PathJoinSubstitution([FindPackageShare('cargo_bot_navigation'), 'config', 'ekf.yaml'])` se resuelve a algo como `/mnt/c/Users/agusp/cargo_bot_ws/install/cargo_bot_navigation/share/cargo_bot_navigation/config/ekf.yaml`.
+Ejemplo: `PathJoinSubstitution([FindPackageShare('cargo_bot_navigation'), 'config', 'ekf.yaml'])` se resuelve a algo como `/mnt/c/Users/agusp/Documentos/cargo_bot_ws/install/cargo_bot_navigation/share/cargo_bot_navigation/config/ekf.yaml`.
 
 #### `Node(package='...', executable='...', name='...', parameters=[...])`
 
@@ -1016,7 +1016,7 @@ Importante: si modificaste `sensors.xacro` en §2 (el upgrade del `imu_link`) pe
 
 ```bash
 # En WSL, desde cargo_bot_ws/
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 colcon build --packages-select cargo_bot_description cargo_bot_navigation cargo_bot_bringup
 source install/setup.bash
 ```
@@ -1030,10 +1030,10 @@ source install/setup.bash
 
 ```bash
 # Verificar instalación
-ls /mnt/c/Users/agusp/cargo_bot_ws/install/cargo_bot_navigation/share/cargo_bot_navigation/config/
+ls /mnt/c/Users/agusp/Documentos/cargo_bot_ws/install/cargo_bot_navigation/share/cargo_bot_navigation/config/
 # Esperar ver: ekf.yaml
 
-ls /mnt/c/Users/agusp/cargo_bot_ws/install/cargo_bot_bringup/share/cargo_bot_bringup/launch/
+ls /mnt/c/Users/agusp/Documentos/cargo_bot_ws/install/cargo_bot_bringup/share/cargo_bot_bringup/launch/
 # Esperar ver: localization.launch.py
 # Si esta lista está vacía, el setup.py no fue editado bien (revisar arriba)
 
@@ -1481,7 +1481,7 @@ ROS 2 NO garantiza orden estricto de inicialización entre acciones de un Launch
 ### Build + verificar
 
 ```bash
-cd /mnt/c/Users/agusp/cargo_bot_ws
+cd /mnt/c/Users/agusp/Documentos/cargo_bot_ws
 colcon build --packages-select cargo_bot_navigation cargo_bot_bringup
 source install/setup.bash
 ```
@@ -1506,8 +1506,8 @@ Después:
 
 ```bash
 source /opt/ros/humble/setup.bash
-source /mnt/c/Users/agusp/cargo_bot_ws/config/source_ros_wsl.sh
-source /mnt/c/Users/agusp/cargo_bot_ws/install/setup.bash
+source /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/source_ros_wsl.sh
+source /mnt/c/Users/agusp/Documentos/cargo_bot_ws/install/setup.bash
 
 ros2 launch cargo_bot_bringup slam.launch.py
 ```
@@ -1518,7 +1518,7 @@ Output esperado: log con `ekf_filter_node` arrancando, después `slam_toolbox` (
 
 ```bash
 source /opt/ros/humble/setup.bash
-source /mnt/c/Users/agusp/cargo_bot_ws/config/source_ros_wsl.sh
+source /mnt/c/Users/agusp/Documentos/cargo_bot_ws/config/source_ros_wsl.sh
 
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
@@ -1561,11 +1561,11 @@ slam_toolbox tiene dos servicios para guardar:
 
 ```bash
 # Crear carpeta para el mapa (si no existe)
-mkdir -p /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_navigation/maps
+mkdir -p /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_navigation/maps
 
 # Guardar mapa estándar (Nav2 format)
 ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap \
-  "{name: {data: '/mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_navigation/maps/scene_v4'}}"
+  "{name: {data: '/mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_navigation/maps/scene_v4'}}"
 ```
 
 #### Desglose
@@ -1584,7 +1584,7 @@ Después del comando se crean:
 ### Verificación
 
 ```bash
-ls -la /mnt/c/Users/agusp/cargo_bot_ws/src/cargo_bot_navigation/maps/
+ls -la /mnt/c/Users/agusp/Documentos/cargo_bot_ws/src/cargo_bot_navigation/maps/
 ```
 
 Esperar ver los dos archivos. El `.pgm` lo podés abrir con cualquier viewer de imágenes (Windows Photos, IrfanView, etc.) — vas a ver tu mapa: negro=ocupado, blanco=libre, gris=desconocido.

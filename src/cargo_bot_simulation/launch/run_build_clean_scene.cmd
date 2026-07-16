@@ -20,7 +20,7 @@ echo === cargo_bot_ws clean scene builder ===
 
 set ROS_DOMAIN_ID=1
 set RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-set FASTRTPS_DEFAULT_PROFILES_FILE=C:\Users\agusp\cargo_bot_ws\config\fastdds_isaac.xml
+set FASTRTPS_DEFAULT_PROFILES_FILE=C:\Users\agusp\Documentos\cargo_bot_ws\config\fastdds_isaac.xml
 
 call "C:\isaacsim_51_ga\setup_ros_env.bat"
 
@@ -29,7 +29,7 @@ echo Launching build_clean_scene.py ...
 echo (one-shot ~30-60s)
 echo.
 
-"C:\isaacsim_51_ga\python.bat" "C:\Users\agusp\cargo_bot_ws\src\cargo_bot_simulation\scripts\build_clean_scene.py"
+"C:\isaacsim_51_ga\python.bat" "C:\Users\agusp\Documentos\cargo_bot_ws\src\cargo_bot_simulation\scripts\build_clean_scene.py"
 
 echo.
 echo === done ===
